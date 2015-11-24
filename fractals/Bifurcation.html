@@ -1,0 +1,194 @@
+<html>
+ <head>
+<script>
+
+sqr=function(x){return Math.pow(x-1,2)}
+
+var canvas;
+var ctx;
+
+var xscale = 534*1;
+var yscale = 220*1;
+
+var psize = 2;
+
+var rrange = [1, 4] 
+//var lrange = [ln(rrange[0]), ln(rrange[1])]
+var erange = [sqr(rrange[0]), sqr(rrange[1])]
+var rtot = 3000
+
+var prestep = 100
+var stopAfter = 80
+
+var ar = [];
+
+var ticklen = 10 //ms
+var tickskip = 1
+
+var isRunning = true;
+
+var timeout;
+
+
+function draw() {
+  canvas = document.getElementById("canvas");
+  ctx = canvas.getContext("2d");
+  ctx.fillStyle = "rgb(0,0,0)";
+  //canvas.addEventListener("click", function(e){alert(e.pageX)}, false)
+
+  canvas.width = xscale*1.1+2  
+  canvas.height = yscale*3.35+2
+  ctx.translate(0, yscale+1)
+  
+  psize = xscale / rtot
+  getStarted()
+}
+
+
+function drawP(x,y) {
+  //ctx.fillRect(x*xscale, -y*yscale, psize, psize)
+  //ctx.fillRect(x*xscale, y*yscale-yscale, psize, psize)
+  ctx.fillRect(-x*xscale+xscale, y*yscale-yscale, psize, psize)
+
+}
+
+function clear() {
+  ctx.clearRect(-canvas.width,-canvas.height,canvas.width*2+2,canvas.height*2+2)
+}
+
+function getStarted() {
+  for(var i=rrange[0]; i<rrange[1]; i+=(rrange[1]-rrange[0])/rtot) {
+    ar.push([.5, i])
+  }
+  prerun()
+  drawar()
+  mand()
+  tick()
+  lines()
+}
+
+function prerun() {
+  for(var i=0; i<prestep; i++) ar=ar.map(xn)
+}
+
+var ts = 0;
+function tick() {
+  ts++
+  ar=ar.map(xn)
+  //clear()
+  drawar()
+  if(ts>stopAfter) isRunning=false
+  
+  if(isRunning) {
+    //(ts%tickskip)?tick():timeout=setTimeout(tick, ticklen)
+    if(ts%tickskip==0) setTimeout(tick, ticklen)
+    else tick()
+  }
+}
+
+
+// [x, r]
+function xn(p) {
+  var x=p[0]
+  var r=p[1]
+  return [r*x*(1-x), r]
+}
+
+function drawar() {
+  for(i in ar) {
+    //drawP( (ar[i][1]-rrange[0])/(rrange[1]-rrange[0]) , ar[i][0] )
+    //drawP( ln(ar[i][1])/ln(rrange[1]) , ar[i][0] )
+    drawP( (sqr(ar[i][1])-erange[0])/(erange[1]-erange[0]) , ar[i][0] )
+  }
+  
+}
+
+
+function mand() {
+  var pt=psize
+  ctx.translate(1/500*xscale, -37/220*yscale)
+  var x,y,xtemp,cMin,cMax,dMin,dMax,cDif,dDif,varic,varid,it
+  
+  var acc=70
+  var vari=xscale*1.15*1.5
+  psize=1
+
+  cMin = -2
+  cMax = .6
+  dMin = -1.2
+  dMax = 1.2
+  cDif = cMax-cMin
+  dDif = dMax-dMin
+  varic = cDif/vari
+  varid = dDif/vari
+
+  for(c=cMin; c<cMax; c+=varic) {
+    for(d=dMin; d<dMax; d+=varid) {
+      x = c;
+      y = d;
+ 
+      for(it = 0; x*x + y*y < 4 && it < acc; it++) {
+        xtemp = x*x - y*y + c;
+        y = 2*x*y + d;
+        x = xtemp;
+      }
+
+      if (it == acc) {
+        ctx.fillRect(1.15*xscale*((c-cMin)/cDif), 1.07*xscale*((d-dMin)/dDif), psize, psize)
+      }
+    }
+    d=0  //yeah, we're explicitly doing the y=0 line, because it's very thin and we want it to show up
+    x = c;
+    y = d;
+ 
+    for(it = 0; x*x + y*y < 4 && it < acc; it++) {
+      xtemp = x*x - y*y + c;
+      y = 2*x*y + d;
+      x = xtemp;
+    }
+    if (it == acc) {
+      ctx.fillRect(1.15*xscale*((c-cMin)/cDif), 1.07*xscale*((d-dMin)/dDif), psize/2, psize/2)
+    }
+
+  }
+  
+  ctx.translate(-1/500*xscale, 37/220*yscale)
+  psize=pt
+}
+
+function lines() {
+  ctx.lineWidth=1/2
+  ctx.strokeStyle="rgb(255,0,0)"
+  ctx.beginPath()
+  ctx.moveTo(.5,-yscale)
+  ctx.lineTo(.5,yscale*2)
+  ctx.moveTo(54.5/534*xscale,-yscale)
+  ctx.lineTo(54.5/534*xscale,yscale*2)
+  ctx.moveTo(59.5/534*xscale,-yscale)
+  ctx.lineTo(59.5/534*xscale,yscale*2)
+  ctx.moveTo(89.5/534*xscale,-yscale)
+  ctx.lineTo(89.5/534*xscale,yscale*2)
+  ctx.moveTo(125.5/534*xscale,-yscale)
+  ctx.lineTo(125.5/534*xscale,yscale*2)
+  ctx.moveTo(143.5/534*xscale,-yscale)
+  ctx.lineTo(143.5/534*xscale,yscale*2)
+  ctx.moveTo(.281*xscale,-yscale)
+  ctx.lineTo(.281*xscale,yscale*2)
+  ctx.moveTo(.334*xscale,-yscale)
+  ctx.lineTo(.334*xscale,yscale*2)
+  ctx.moveTo(296.5/534*xscale,-yscale)
+  ctx.lineTo(296.5/534*xscale,yscale*2)
+  ctx.moveTo(1*xscale,-yscale)
+  ctx.lineTo(1*xscale,yscale*2)
+  ctx.stroke()
+  ctx.strokeStyle="rgb(0,0,0)"
+}
+
+</script>
+ </head>
+ <body onload="draw()">
+ 	A demonstration of the correspondence between the <a href="http://en.wikipedia.org/wiki/Mandelbrot_set">Mandelbrot set</a> and the <a href="http://en.wikipedia.org/wiki/Bifurcation_diagram">bifurcation diagram</a> of the <a href="http://en.wikipedia.org/wiki/Logistic_map">logistic map</a>.<br><br><br>
+
+	<canvas id="canvas" width="1" height="1"></canvas><br><br>
+ </body>
+</html>

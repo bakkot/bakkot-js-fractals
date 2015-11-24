@@ -1,0 +1,435 @@
+<html>
+ <head>
+  <script type="application/x-javascript">
+  
+var canvas;
+var ctx;
+
+//***
+var scale = 500/2;
+
+var f = 5
+var fstep = 1.2
+
+function draw() {
+  canvas = document.getElementById("canvas");
+  ctx = canvas.getContext("2d");
+  ctx.fillStyle = "rgb(0,0,0)";
+  ctx.font = "44pt"
+  
+  canvas.height = scale*2+2
+  canvas.width = scale*2+2
+  ctx.translate(scale+1, scale+1)
+  //invoke start function here
+  canvas.addEventListener("click", clickh, false);
+  canvas.addEventListener("mousedown", downh, false);
+  document.addEventListener("mousemove", moveh, false);
+  document.addEventListener("mouseup", uph, false);
+  getStarted()
+}
+
+function drawLine(startCoords, endCoords) {
+  startCoords = [startCoords[0]*scale*1/f,startCoords[1]*scale*(-1)*1/f]
+  endCoords = [endCoords[0]*scale*1/f,endCoords[1]*scale*(-1)*1/f]
+  ctx.beginPath();
+  ctx.moveTo(startCoords[0], startCoords[1]);
+  ctx.lineTo(endCoords[0], endCoords[1]);
+  ctx.stroke()
+}
+
+function drawPath(a) {
+  for(var i=1; i<a.length; i++) {
+    drawLine(a[i-1], a[i])
+  }
+}
+
+function text(x, y, s) {
+  ctx.font="12px serif"
+  var w = ctx.measureText(s).width/2
+  ctx.fillText(s, x*scale*1/f-w+7, y*-scale*1/f+6)
+}
+
+function textexp(x, y, s) {
+  s=s.split("^");
+  ctx.font="12px serif"
+  var w = ctx.measureText(s[0]).width/2
+  ctx.fillText(s[0], x*scale*1/f-w, y*-scale*1/f+6)
+  ctx.fillText(s[1], x*scale*1/f+w+1, y*-scale*1/f)
+}
+
+
+function axes() {
+  drawLine([-f, 0], [f,0]);
+  drawLine([0,-f], [0,f]);
+
+  var s = Math.floor(Math.log(f)/Math.LN10)
+  var c = Math.pow(10, s)
+
+  if(s==-1 || s==0 || s==1) {
+    text(-c,0,-Math.pow(10,s))
+    text(c,0,Math.pow(10,s))
+    text(0,c,Math.pow(10,s))
+    text(0,-c,-Math.pow(10,s))
+  }
+  else {
+    textexp(-c,0,"-10^" + s)
+    textexp(c,0,"10^" + s)
+    textexp(0,c,"10^" + s)
+    textexp(0,-c,"-10^" + s)
+  }
+}
+
+
+function getStarted() {
+  //drawLine([0,0],[1,1])
+  //drawLine([-1,0], [0,-1])
+  initForm()
+  
+  axes()
+  //tick()
+  ptick()
+}
+
+function redraw() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  draw();
+}
+
+function clear() {
+  linestop()
+  ctx.clearRect(-canvas.width,-canvas.height,canvas.width*2,canvas.height*2)
+  axes()
+}
+
+function linestop() {
+  for (i in timeouts)
+    clearTimeout(timeouts[i])
+  timeouts=[]
+}
+
+
+
+
+
+
+sin=Math.sin
+cos=Math.cos
+exp=function(x){return Math.pow(Math.E, x)}
+pi=Math.PI
+e=Math.E
+sqrt=Math.sqrt
+pow=Math.pow
+log=Math.log
+
+xp="y"
+function xprime(x, y, t) {
+  return eval(xp)
+}
+
+yp="(1+y*y)*(1/x-2*sqrt(1+y*y))"
+function yprime(x, y, t) {
+  return eval(yp)
+}
+
+
+
+
+
+
+
+
+
+function keyh(e) {
+  if(e.metaKey) return
+  var c = String.fromCharCode(e.which)
+  if(c=="r") {
+    plist=[]
+    clear()
+  }
+  else if(c=="p") {
+    ppop()
+  }
+  else if(c=="a") {
+    pRun=!pRun
+    if(pRun && isParticles) ptick()
+  }
+  else if(c=="l") {
+    if(isParticles) {
+      document.getElementById('pr').value="l" //FIXME
+      typeChange("l")
+    }
+    else {
+      typeChange("p")
+    }
+  }
+}
+
+
+
+function clickh(e) {
+  if(!e.shiftKey && !e.altKey) {
+    if(isParticles) return
+    var x = e.pageX-canvas.offsetLeft-scale
+    var y = e.pageY-canvas.offsetTop-scale
+    x/=scale*1/f
+    y/=-scale*1/f
+    tick([[x,y]], x, y, 0, 0)
+  }
+  else if(e.shiftKey) {
+    //alert("shift!")
+    f*=fstep
+    initForm()
+    clear()
+  }
+  else if(e.altKey) {
+    //alert("alt!")
+    f/=fstep
+    initForm()
+    clear()
+  }
+}
+
+var cx=0
+var cy=0
+var mdown = false;
+function moveh(e) {
+  if(!mdown) return
+  var x = e.pageX-canvas.offsetLeft-scale
+  var y = e.pageY-canvas.offsetTop-scale
+  x/=scale
+  y/=-scale
+  if(Math.abs(x)>1 || Math.abs(y)>1) return //outside of canvas
+  x*=f
+  y*=f
+  cx = x
+  cy = y
+  //a = new Particle(x,y)
+  //plist.push(a)
+}
+
+var isParticles = true;
+function uph(){
+  mdown = false
+}
+function downh(e){
+  if(e.shiftKey || e.altKey) return
+  mdown = true
+  var x = e.pageX-canvas.offsetLeft-scale
+  var y = e.pageY-canvas.offsetTop-scale
+  x/=scale
+  y/=-scale
+  if(Math.abs(x)>1 || Math.abs(y)>1) return //outside of canvas
+  x*=f
+  y*=f
+  cx = x
+  cy = y
+  pgen()
+}
+
+var blen = 100
+function pgen() {
+  if(!isParticles) return;
+  var a = new Particle(cx, cy)
+  plist.push(a)
+  if(mdown) setTimeout(pgen, blen)
+  pStart()
+}
+
+
+
+
+
+
+var ticklen = 10
+var tstep = .001
+//var ticks = 0
+
+var curTimeout;
+
+var tmax = 10;
+var drawEvery = 10;
+
+var tx;
+var ty;
+var curpath=[];
+
+timeouts=[];
+function tick(path, x, y, t, ticks) {
+  //clearTimeout(curTimeout)
+  tx = xprime(x, y, t)*tstep;
+  ty = yprime(x, y, t)*tstep;
+  //drawLine([x, y], [x+tx, y+ty]);
+  path.push([x+tx, y+ty])
+  x+=tx;
+  y+=ty;
+  t+=tstep;
+  ticks++;
+  //if(t<tmax) setTimeout(tick, ticklen);
+
+  if(t<tmax) {
+    if(ticks%drawEvery==0) {
+      drawPath(path);
+      path=[[x, y]];
+      curTimeout = setTimeout(function(){tick(path, x, y, t, ticks)}, ticklen);
+      timeouts.push(curTimeout)
+    }
+    else
+      tick(path, x, y, t, ticks)
+  }
+  else {
+    drawPath(path)
+    //curpath=[[x, y]]
+  }
+}
+
+
+
+
+
+
+function Particle(x,y) {
+  this.x=x
+  this.y=y
+  this.t=0
+  this.ticks=0
+}
+
+function drawPart(a) {
+  ctx.beginPath();
+  ctx.arc(a.x*scale*1/f,a.y*scale*(-1)*1/f,3,0,Math.PI*2,true);
+  ctx.stroke()
+  ctx.closePath()
+}
+
+plist = []
+pRun = false
+function ptick() {
+  if(!pRun) return
+  clear()
+  //if(plist.length==0) return
+  if(plist.length==0) {
+    setTimeout(ptick, ticklen)
+    return
+  }
+  for(var i=0; i<plist.length; i++) {
+    a=plist[i]
+    for(var j=0; j<drawEvery; j++) {
+      tx = xprime(a.x, a.y, a.t)*tstep;
+      ty = yprime(a.x, a.y, a.t)*tstep;
+      a.x+=tx
+      a.y+=ty
+      a.t+=tstep
+      a.ticks++
+    }
+    drawPart(a)
+    if(a.t>=tmax) plist.splice(i,1)
+    //alert(tx)
+  }
+  setTimeout(ptick, ticklen)
+}
+
+function pStart() {
+  isParticles=true
+  document.getElementById('pr').checked=true
+  if(!pRun) {
+    pRun=true;
+    ptick()
+  }  
+}
+
+var pw = 50
+var pf=1.2
+function ppop() {
+  var w=2*pf*f/pw
+  var a
+  for(var i=0; i<pw; i++) {
+    for(var j=0; j<pw; j++) {
+      a = new Particle(-f*pf+i*w,-f*pf+j*w)
+      plist.push(a)
+    }
+  }
+  pStart()
+}
+
+
+
+
+function initForm() {
+  document.getElementById('xp').value=xp
+  document.getElementById('yp').value=yp
+  document.getElementById('dER').value=document.getElementById('dET').value=drawEvery
+  document.getElementById('tLR').value=document.getElementById('tLT').value=ticklen
+  document.getElementById('tSR').value=tstep*1000
+  document.getElementById('tST').value=tstep
+  document.getElementById('tMR').value=document.getElementById('tMT').value=tmax
+  document.getElementById('fR').value=f*10
+  document.getElementById('fT').value=f
+  document.getElementById('fSR').value=fstep*100
+  document.getElementById('fST').value=fstep
+
+}
+
+function vUpdate(a) {
+  if(a.name=="tstep")
+    window[a.name]=a.nextSibling.value=a.value/1000
+  else if(a.name=="f")
+    window[a.name]=a.nextSibling.value=a.value/10
+  else if(a.name=="fstep")
+    window[a.name]=a.nextSibling.value=a.value/100
+  else
+    window[a.name]=a.nextSibling.value=a.value
+
+  if(a.name=="f") clear()
+}
+
+function tUpdate(a) {
+  window[a.name]=a.previousSibling.value=a.value
+  if(a.name=="f") clear()  
+}
+
+function typeChange(s) {
+  if(s=="l") isParticles=false
+  else if(s=="p") isParticles=true
+  pRun=isParticles
+  if(pRun) ptick()
+  clear()
+}
+
+function eqreset() {
+  document.getElementById('xp').value=xp
+  document.getElementById('yp').value=yp
+  plist=[]
+  clear()
+}
+
+function eqapply() {
+  xp=document.getElementById('xp').value
+  yp=document.getElementById('yp').value
+  plist=[]
+  ppop()
+  clear()
+}
+
+ </script>
+ </head>
+ <body onload="draw()">
+	Graphs differential equations. Enter x, y, and/or t dependent expressions for x' and y'. You can use standard functions like exp, log, sin, and sqrt. To perform exponents with bases other than e, use 'pow(base, power)'.<br><br>
+	
+	Click to drop particles or lines, depending on the option selected. Lines persist; particles do not.
+	<br><br><br>
+   <canvas id="canvas" width="1" height="1"></canvas><br><br>
+   <form>
+   <table cellpadding=8><tbody>
+   <tr><td>x'(x,y,t)= <input id='xp' size=35></input>&nbsp;&nbsp;&nbsp;</td><td><input type="button" onclick="eqreset()" value="Reset" /></td></tr>
+   <tr><td>y'(x,y,t)= <input id='yp' size=35></input>&nbsp;&nbsp;&nbsp;</td><td><input type="button" onclick="eqapply()" value="Apply" /></td></tr>
+   <tr><td>Particles:<input type="radio" name="clicktype" value="p" id="pr" onchange="typeChange('p')" checked>&nbsp;&nbsp;Lines:<input type="radio" name="clicktype" value="l" onchange="typeChange('l')"></td><td></td></tr>
+   <tr><td></td><td></td></tr>
+   <tr><td>drawEvery: <input name="drawEvery" id="dER" type="range" min='1' max='100' onchange="vUpdate(this)"/><input name="drawEvery" id="dET" size=3 onchange='tUpdate(this)'/></td><td>ticklen: <input name="ticklen" id="tLR" type="range" min='10' max='1000' onchange="vUpdate(this)"/><input name="ticklen" id="tLT" size=3 onchange='tUpdate(this)'/></td></tr>
+   <tr><td>tstep: <input name="tstep" id="tSR" type="range" min='1' max='100' onchange="vUpdate(this)"/><input name="tstep" id="tST" size=3 onchange='tUpdate(this)'/></td><td>tmax: <input name="tmax" id="tMR" type="range" min='1' max='30' onchange="vUpdate(this)"/><input name="tmax" id="tMT" size=3 onchange='tUpdate(this)'/></td></tr>
+   <tr><td>f: <input name="f" id="fR" type="range" min='1' max='100' onchange="vUpdate(this)"/><input name="f" id="fT" size=3 onchange='tUpdate(this)'/></td><td>fstep: <input name="fstep" id="fSR" type="range" min='101' max='200' onchange="vUpdate(this)"/><input name="fstep" id="fST" size=3 onchange='tUpdate(this)'/></td></tr>
+   <tr><td></td><td></td></tr>
+   </tbody>
+   </table>
+   </form>
+ </body>
+</html>

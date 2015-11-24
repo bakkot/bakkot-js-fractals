@@ -1,0 +1,198 @@
+<html>
+ <head>
+<script type="application/x-javascript">
+  
+var canvas;
+var ctx;
+var pi = Math.PI
+
+
+var scale = 500/(4*pi);
+var cw = 3;
+
+
+// domain = [-2pi, 2pi]^2
+// center = [0,0]
+
+function draw() {
+	canvas = document.getElementById("canvas");
+	ctx = canvas.getContext("2d");
+	canvas.height = scale*4*pi+2
+	canvas.width = scale*4*pi+2
+    
+    ctx.translate(scale*2*pi, scale*2*pi)
+	
+	ctx.fillStyle="rgb(0,0,0)"
+    getStarted()
+}
+
+function Point(x,y) {
+	this.x = x
+	this.y = y
+	this.clone = function(){return new Point(this.x, this.y)}
+	this.toString = function(){return "(" + this.x + "," + this.y + ")"}
+	this.draw = function(){drawCircle(this)}
+}
+
+function drawCircle(p) {
+  ctx.beginPath();
+  ctx.arc(p.x*scale, p.y*-scale, cw, 0, Math.PI*2, true);
+  ctx.fill()
+}
+
+function drawLine(ar, ar1) {
+  ctx.beginPath();
+  ctx.moveTo(ar[0]*scale, ar[1]*-scale);
+  ctx.lineTo(ar1[0]*scale, ar1[1]*-scale);
+  ctx.stroke()
+}
+
+function drawLineP(p1, p2) { // for Points
+	drawLine([p1.x, p1.y], [p2.x, p2.y]);
+}
+
+function drawPolyP(a) {
+	ctx.beginPath();
+	ctx.moveTo(a[0].x*scale, a[0].y*-scale);
+	for(i=1; i<a.length; i++) {
+		ctx.lineTo(a[i].x*scale, a[i].y*-scale);
+	}
+	ctx.lineTo(a[0].x*scale, a[0].y*-scale);
+	ctx.fill();
+	ctx.closePath();
+}
+
+function drawCenter(a) {
+	var center = new Point((a[0].x + a[2].x)/2, (a[0].y+a[2].y)/2);
+	center.draw();
+}
+
+
+
+function spiral(theta_, forward) {
+	var rev = forward?1:-1;
+	var pp = [0, 0];
+	var r, x, y;
+	for(var theta = 0; theta<2*pi; theta+= pi/100) {
+		r = theta
+		x = r*Math.cos(theta + theta_*2*pi)
+		y = rev*r*Math.sin(theta + theta_*2*pi); //only need to rev. y: cos is even
+		drawLine(pp, [x,y]);
+		pp = [x,y];
+	}
+}
+
+function getStarted() {
+	pinecone();
+// 	return;
+// 	var n = 3;
+// 	for(var i=2; i<n; i++) {
+// 		spiral(i/n * 2*pi, true);
+// 		break;
+// 	}
+// 
+// 	n = 5;
+// 	for(var i=1; i<n; i++) {
+// 		spiral(i/n * 2*pi, false);
+// 		break;
+// 	}
+}
+
+function pinecone() {
+	function intersect(i, j) {
+     	var t1 = (i - j)*pi
+     	var t2 = pi+(i - j)*pi
+     	var r1 = t1-i*pi*2
+     	if(r1<0) r1+=2*pi
+     	var r2 = t2-i*pi*2
+     	if(r2<0) r2+=2*pi
+     	return [[r1, new Point(r1*Math.cos(t1), r1*Math.sin(t1))], [r2, new Point(r2*Math.cos(t2), r2*Math.sin(t2))]]
+	}
+	
+	function dots(i, kf) {
+		var ins = [];
+		for(var k=0; k<kf; k++) {
+			var j = k/kf;
+			inss = intersect(i, j);
+
+			ins.push(inss);
+		}	
+		return ins
+	}
+	
+	function findLeaf(i, j, k) {
+		function findValid(a, t) {
+			if(t[0][0] > a[0] && a[0] > t[1][0]) { //only one option
+				return t[0]
+			}
+			else if(t[1][0] > a[0] && a[0] > t[0][0]) { //only one option
+				return t[1]
+			}
+			else if(t[0][0] < t[1][0] && t[0][0] > a[0]) { //lesser of 2
+				return t[0]
+			}
+			else if(t[1][0] < t[0][0] && t[1][0] > a[0]) { //lesser of 2
+				return t[1]
+			}
+			else { // no options, ie outer edge
+				return null
+			}
+		}
+		
+		var a = loDots[i][j][k];
+		var b = findValid(a, loDots[i][(j-1+kkf)%kkf]);
+		var c = findValid(a, loDots[(i-1+iif)%iif][j]);
+		var d = findValid(a, loDots[(i-1+iif)%iif][(j-1+kkf)%kkf]);
+		
+		if(!d || !c || !b) return null;
+		return [a[1], b[1], d[1], c[1]]; // reordered for drawing
+	}
+	
+	var iif = 34;
+	var kkf = 21;
+	var loDots = [];
+	for(var i=0; i<iif; i++) {
+		loDots.push(dots(i/iif, kkf))
+	}
+	// loDots[a][b] will give the intersections between a and b.
+	
+	
+	
+	
+	var l;
+	for(var i=0; i<iif; i++) {
+		for(var j=0; j<kkf; j++) {
+			for(var k=0; k<2; k++) { //2 inters per leaf
+				l = findLeaf(i, j, k);
+				if(!l) continue; //edge case (tee-hee)
+				
+// 				l[0].draw()
+// 				l[1].draw()
+// 				l[2].draw()
+// 				l[3].draw()
+				//ctx.fillStyle = "rgba(0,0,0," + Math.random() + ")";
+				//drawPolyP(l);
+				drawCenter(l);
+			}
+		}
+	}
+	var l = findLeaf(2, 4, 1)
+	l[0][1].draw()
+	l[1][1].draw()
+	l[2][1].draw()
+	l[3][1].draw()
+	
+	// TODO modular
+	
+	
+}
+
+
+</script>
+ </head>
+ <body onload="draw()">
+ 	Meant to recreate the pattern of seeds on a sunflower.
+ 	<br><br><br>
+   <canvas id="canvas" width="1" height="1" style="padding:20px"></canvas>
+ </body>
+</html>

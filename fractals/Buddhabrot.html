@@ -1,0 +1,116 @@
+<html>
+ <head>
+<script>
+var scale = 534;
+
+var psize = 1;
+
+cMin = -2
+cMax = .6
+dMin = -1.2
+dMax = 1.2
+cDif = cMax-cMin
+dDif = dMax-dMin
+
+function draw() {
+  canvas = document.getElementById("canvas");
+  ctx = canvas.getContext("2d");
+  ctx.fillStyle = "rgb(0,0,0)";
+
+  canvas.height = scale*1.2+2  
+  canvas.width = scale*1+2
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+
+  mand(2e5, "rgba(138,181,255,.01)", 500)
+}
+
+
+//totp = 2e5
+function mand(totp, color, acc) {
+  var x,y
+  ctx.fillStyle = color;
+
+  
+  var vari=scale*1.15*1.5
+
+
+  for(var j=0; j<totp; j++) {
+    x=Math.random()*4-2
+    y=Math.random()*4-2
+    if(x<cMin || x>cMax || y<dMin || y>dMax) continue;
+    seq(x,y, acc)
+  }
+
+	var ms = 0;
+	for(var i=0; i<scale*1.3; i++) {
+		for(var j = 0; j<scale*1.3; j++) {
+			pa[i][j] = Math.log(pa[i][j])
+			if(pa[i][j] > ms) ms = pa[i][j]
+		}
+	}
+	
+
+	for(var i=0; i<scale*1.3; i++) {
+		for(var j = 0; j<scale*1.3; j++) {
+			//alert(i + "," + j)
+			if(pa[i][j]==-Infinity) continue; //wut
+			ctx.fillStyle = "rgba(138,181,255," + Math.min(1, pa[i][j]/ms) + ")"
+			ctx.fillRect(j, i, psize, psize)
+		}
+	}
+
+	console.log(pa)	
+}
+
+function ry(y) {
+	return Math.round(scale*((y-dMin)/dDif))
+}
+
+function rx(x) {
+	return Math.round(scale*((x-cMin)/cDif))
+}
+
+pa = []
+for(i=0; i<scale*1.3; i++) {
+	pa[i] = []
+	for(j = 0; j<scale*1.3; j++) {
+		pa[i][j] = 0
+	}
+}
+
+function seq(c, d, acc) {
+	if(c*c + d*d >= 4) return false
+	var x = c;
+	var y = d;
+  
+	var it;
+	for(it = 0; x*x + y*y < 4 && it < acc; it++) {
+		xtemp = x*x - y*y + c;
+		y = 2*x*y + d;
+		x = xtemp;
+	}
+	if (it != acc) {
+    	return;
+	}
+	
+	x = c;
+	y = d;
+	for(it = 0; x*x + y*y < 4 && it < acc; it++) {
+		xtemp = x*x - y*y + c;
+		y = 2*x*y + d;
+		x = xtemp;
+		try {
+			pa[rx(x)][ry(y)]++;
+		}
+		catch(e) {} //fuck it
+	}
+}
+
+</script>
+ </head>
+ <body onload="draw()">
+ 	A demonstration of the <a href="http://en.wikipedia.org/wiki/Buddhabrot">Buddhabrot</a>.
+ 	<br><br><br>
+   <canvas id="canvas" width="1" height="1"></canvas><br><br>
+ </body>

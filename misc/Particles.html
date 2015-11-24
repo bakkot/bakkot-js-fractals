@@ -1,0 +1,237 @@
+<html>
+ <head>
+  <script type="application/x-javascript">
+  
+var canvas;
+var ctx;
+
+var CXscale = 500;
+var CYscale = 500;
+
+var xscale = 1;
+var yscale = 1;
+
+var int = 20;
+
+var cw = 3;
+
+var pAr = []
+var totP = 40; // number of points
+
+var speedlim = .01
+
+var basemass = 1;
+//var G = 6.6743 * Math.pow(10, -11)
+var G = 1*Math.pow(10, -6);
+var tl = 1
+
+function draw() {
+	canvas = document.getElementById("canvas");
+	ctx = canvas.getContext("2d");
+	canvas.height = CXscale+2
+	canvas.width = CYscale+2
+	canvas.addEventListener("click", onOff, false)
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.lineTo(0,CYscale);
+    ctx.lineTo(CXscale,CYscale);
+    ctx.lineTo(CXscale,0);
+    ctx.lineTo(0,0);
+    ctx.stroke();
+    ctx.translate(0, CYscale+1)
+	//invoke start function here
+    getStarted()
+}
+function square(v) {
+  if(v) return v*v
+  else return this*this;
+}
+Number.prototype.sq = square;
+
+
+function drawCircle(ar, c) {
+  ctx.beginPath();
+  ctx.arc(ar[0]/xscale * CXscale,ar[1]/yscale * -1*CYscale,cw,0,Math.PI*2,true);
+  if(c) {
+    ctx.fillStyle = c;
+    ctx.fill()
+  }
+  else {
+    ctx.fillStyle = "rgb(0,0,0)";
+    ctx.fill()
+  }
+}
+
+function drawLine(ar, ar1) {
+  ctx.beginPath();
+  ctx.moveTo(ar[0]*scale, ar[1]*-scale);
+  ctx.lineTo(ar1[0]*scale, ar1[1]*-scale);
+  ctx.stroke()
+}
+
+function getStarted() {
+  //Points consist of x, y, mass, x velocity, y velocity.
+  for(var i=0; i<totP; i++) {
+    pAr.push([Math.random(), Math.random(), basemass, 0, 0])
+  }
+  for(var i=0; i<totP; i++) {
+    drawCircle(pAr[i], "rgb(255,0,0)")
+  }
+  
+}
+
+
+//a = F/m
+function tick() {
+  ctx.clearRect(-1,-CYscale-1, CXscale+3, CYscale+2)
+  ctx.translate(0, -CYscale-1)
+  ctx.beginPath();
+  ctx.moveTo(0,0);
+  ctx.lineTo(0,CYscale);
+  ctx.lineTo(CXscale,CYscale);
+  ctx.lineTo(CXscale,0);
+  ctx.lineTo(0,0);
+  ctx.stroke();
+  ctx.translate(0, CYscale+1)
+
+  var tAr = [];
+  for(var i=0; i<totP; i++) {
+    var fm = 0;
+    var fd = 0;
+    var fAr = [];
+    for(var j=0; j<totP; j++) {
+      if(j!=i) {
+        m1 = pAr[i][2]
+        m2 = pAr[j][2]
+        r = calcDist(pAr[i], pAr[j])
+        F = G*((m1*m2)/r.sq())
+        var leng = calcDist(pAr[i], pAr[j])
+        ihat = (pAr[i][0]-pAr[j][0])/leng
+        jhat = (pAr[i][1]-pAr[j][1])/leng
+        fAr.push([ihat*F, jhat*F])
+        }
+    }
+    //var tf = sumVectors(fAr)
+    var tx = 0;
+    var ty = 0;
+    for(var j=0; j<fAr.length; j++) {
+      tx+=fAr[j][0]
+      ty+=fAr[j][1]
+    }
+    
+    var ax = tx/pAr[i][2]
+    var ay = ty/pAr[i][2]
+    var nvx = ax*tl
+    var nvy = ay*tl
+    var xvelo = pAr[i][3]+nvx
+    var yvelo = pAr[i][4]+nvy
+    var xdist = xvelo*tl
+    var ydist = yvelo*tl
+    
+    var xsum = pAr[i][0] + xdist
+    if(xsum < 0) {
+      xsum = -xsum
+      xvelo = -xvelo
+    }
+    if(xsum > xscale) {
+      xsum = 2*xscale - xsum
+      xvelo = -xvelo
+      //xvelo = 0
+    }
+    
+    var ysum = pAr[i][1] + ydist
+    if(ysum < 0) {
+      ysum = -ysum
+      yvelo = -yvelo
+    }
+    if(ysum > yscale) {
+      ysum = 2*yscale - ysum
+      yvelo = -yvelo
+    }
+    
+    
+    if(xvelo>speedlim) xvelo=speedlim
+    if(xvelo<-1* speedlim) xvelo=-1*speedlim
+    if(yvelo>speedlim) yvelo=speedlim
+    if(yvelo<-1* speedlim) yvelo=-1*speedlim
+    
+    //var npoint = [xsum, ysum, pAr[i][2], sumv[0], sumv[1]]
+    //var npoint = [xsum, ysum, pAr[i][2], vVec[0], vVec[1]]
+    var npoint = [xsum, ysum, pAr[i][2], xvelo, yvelo]
+    tAr.push(npoint)
+    if(i<2) drawCircle(npoint, "rgb(255,0,0)")
+    else drawCircle(npoint)
+  }
+  pAr = tAr
+  
+  if(running) window.setTimeout(tick, int)
+}
+
+
+
+// Calculation functions
+
+function calcLine(p1, p2) {
+  m = (p2[1] - p1[1]) / (p2[0]-p1[0])
+  b = -m * p1[0] + p1[1]
+  return [m, b]
+}
+
+function calcInter(l1, l2) {
+  x = (l2[1] - l1[1]) / (l1[0] - l2[0])
+  y = l2[0] * x + l2[1]
+  return [x, y]
+}
+
+function calcMidpoint(p1, p2) {
+  x = (p1[0]+p2[0])/2
+  y = (p1[1]+p2[1])/2
+  return [x, y]
+}
+
+function calcDist(p1, p2) {
+  return Math.sqrt((p1[0]-p2[0]).sq() + (p1[1]-p2[1]).sq())
+}
+
+function calcClosest(ref, p1, p2) {
+  dist1 = calcDist(ref, p1)
+  dist2 = calcDist(ref, p2)
+  if(dist1 < dist2)
+    return p1
+  else if(dist2 < dist1)
+    return p2
+  else
+    return ref 
+}
+
+function calcAngle(p1, p2) {
+  return Math.atan2(p1[1]-p2[1], p1[0]-p2[0])
+}
+
+
+function pFromAPD(a, p, d) {
+  //That is, find the two points a given distance away from a given point on a given angle.
+  x = p[0]
+  y = p[1]
+  x2 = d * Math.cos(a) + x
+  y2 = d * Math.sin(a) + y
+  return [x2, y2]
+}
+
+
+
+var running = false;
+function onOff() {
+  running=!running
+  if(running) tick()
+}
+
+
+  </script>
+ </head>
+ <body onload="draw()">
+   Simulates particle interactions. Click to pause/play. (Colored particles have no special properties; they just give the eye something to follow.)
+   <br><br><br>
+   <canvas id="canvas" width="1" height="1"></canvas>
+ </body>
+</html>

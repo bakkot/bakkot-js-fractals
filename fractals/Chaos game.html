@@ -1,0 +1,157 @@
+<html>
+<body onload="draw()">
+
+<script>
+
+
+function tweak() { // some nonsense to introduce a slow-drawing effect without actually changing code
+  function tfunc(t) {
+    return function(){t.tick()}
+  }
+
+  var prot = CanvasRenderingContext2D.prototype
+  prot._clearRect = prot.clearRect
+  prot.clearRect = function(x, y, a, b){this.clist=[]; this._clearRect(x,y,a,b)} //special
+  
+  prot._beginPath = prot.beginPath
+  prot.beginPath = function(){}
+  prot._moveTo = prot.moveTo
+  prot.moveTo = function(x, y){this.curp = [x,y]}
+  prot._lineTo = prot.lineTo
+  prot.lineTo = function(x, y){this.clist.push("lT(" + this.curp[0] + "," + this.curp[1] +  ";" + x + "," + y + ")"); this.curp = [x,y]; this.tick(true)}
+  prot._closePath = prot.closePath
+  prot.closePath = function(){}
+  prot._stroke = prot.stroke
+  prot.stroke = function(){}
+  
+  prot.curp = [0,0]
+  prot.tlength = 0
+  prot.skipfactor=10
+  prot.running = false
+  prot.clist = []
+  
+  prot.tick = function(s){
+    if(s && !this.running) {
+       this.running = true
+       setTimeout(tfunc(this), 1)
+    }
+    else if(!s) {
+      var nc = this.clist.pop()
+      if(nc.match("lT")) {
+        var afore = nc.match(/\(([^;]*);/)[1].split(",").map(function(x){return 1*x})
+        var after = nc.match(/;([^\)]*)\)/)[1].split(",").map(function(x){return 1*x})
+        this._beginPath()
+        this._moveTo(afore[0], afore[1])
+        this._lineTo(after[0], after[1])
+        this._closePath()
+        this._stroke()
+        //this.curp = after
+        
+        if(this.clist.length>0) {
+          if(this.skipfactor<0) this.tick()
+          else if(Math.floor(Math.random()*this.skipfactor)==0) setTimeout(tfunc(this), this.tlength)
+          else this.tick()
+        }
+        else this.running = false
+      }
+      else {
+        if(this.clist.length>0) {
+          this.tick()
+        }
+        else this.running = false
+      }
+      
+    }
+  }  
+  
+}
+
+
+pre = 100 //number of iterations to do before drawing
+num = 4000 //number of iterations to draw
+
+function drawPoint(x,y) {
+  ctx.beginPath();
+  ctx.moveTo(x*scale+1, y*-scale+scale+1)
+  ctx.lineTo(x*scale+2, y*-scale+scale+1)
+  ctx.closePath();
+  ctx.stroke();
+}
+
+var p = {"x":0, "y":0}
+var scale = 500
+function draw() {
+	canvas = document.getElementById("canvas");
+	tweak()
+	ctx = canvas.getContext("2d")
+		
+	ctx.fillStyle = "rgb(0,0,0)";
+  canvas.height = scale+2
+  canvas.width = scale+2
+
+  chaos()
+}
+
+
+function reset() {
+  ctx.clearRect(0,0,2*canvas.width, 2*canvas.height)
+}
+
+eps = poly(3)
+r = 1/2 //fraction of distance to move, will be choosable
+function chaos() {
+  p.x = Math.random()
+  p.y = Math.random()
+  for(var i=0; i<pre; i++)
+  	p = iter(p, eps, r)
+  for(var i=0; i<num; i++) {
+    drawPoint(p.x, p.y)
+    p = iter(p, eps, r)
+  }
+}
+
+function iter(p, eps, r) {
+  var nend = eps[Math.floor(Math.random()*eps.length)]
+  var nx = p.x+r*(nend[0]-p.x)
+  var ny = p.y+r*(nend[1]-p.y)
+  return {"x":nx, "y":ny}
+}
+
+function poly(n, c, rot, s) { //number of endpoints, optional center, optional initial rotation, optional scaling factor
+  if (typeof(rot)=="undefined") rot=0;
+  if (typeof(c)=="undefined") c=[.5,.5]
+  if (typeof(s)=="undefined") s=1/2
+  if (n<3) n=3
+  var o = []
+  var w = 2*Math.PI/n
+  rot+=w/2-Math.PI/2
+  for (var i=0; i<n; i++) {
+    var itbit=i*w+rot
+    o[i] = [Math.cos(itbit)*s+c[0], Math.sin(itbit)*s+c[1]]
+  }
+  return o
+}
+
+function button() {
+  eps = poly(document.getElementById("nbox").value*1)
+  r = document.getElementById("rbox").value*1
+  num = document.getElementById("pbox").value*1
+  reset()
+  chaos()
+}
+
+</script>
+ 	A demonstration of the '<a href="http://en.wikipedia.org/wiki/Chaos_game">chaos game</a>' method for generating fractals.
+ 	<br><br><br>
+
+
+<canvas id="canvas"></canvas><br><br>
+
+<form>
+<input type="button" value="Go!" onclick="button()"><br>
+Corners: <input type="text" size=4 id="nbox" value="3" /><br>
+Jump distance: <input type="text" size=4 id="rbox" value=".5" /><br>
+Points: <input type="text" size=10 id="pbox" value="4000" />
+</form>
+</body>
+</html>

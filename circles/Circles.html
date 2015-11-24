@@ -1,0 +1,1020 @@
+<html>
+<head><title>Vi Hart is Awesome</title></head>
+<body onload="draw()">
+
+A little project inspired by <a href="http://www.youtube.com/watch?v=heKK95DAKms">Vi Hart</a>.<br>
+
+Click and drag to draw circles. Make sure all circles overlap with at least one other.<br>
+
+Once you've drawn some circles, press space to convert your doodle into a surface. Then click and drag to rotate. (3D done using <a href="deanm.github.com/pre3d/">deanm's pre3d</a> library.)
+<br><br><b>
+
+
+<canvas id="canvas" />
+
+<script>
+var canvas;
+var ctx;
+
+var scale = 300;
+
+pi = Math.PI
+sin = Math.sin
+cos = Math.cos
+
+//var circleList = [new Circle(-.4, -.2, .6), new Circle(.16, .1, .2), new Circle(.4, .2, .6), new Circle(-.1, .4, .5), new Circle(-.1, .1, .4)]
+//var circleList = [new Circle(-.4, -.2, .6), new Circle(.16, .1, .2), new Circle(-.26, -.1, .2), new Circle(.4, .2, .6), new Circle(-.1, .4, .5), new Circle(-.1, .1, .4)]
+//var circleList = [new Circle(-.4, -.2, .6), new Circle(.4, .2, .6), new Circle(-.1, .4, .5), new Circle(-.1, .1, .4)]
+//var circleList = [new Circle(-.4, -.2, .6), new Circle(.4, .2, .6), new Circle(-.1, .4, .5), new Circle(-.3, .4, .5), new Circle(-.1, .1, .4)]
+//var circleList = [new Circle(-.4, -.2, .6), new Circle(.4, .2, .6), new Circle(-.4, -.4, .2), new Circle(-.1, .4, .5), new Circle(-.3, .4, .5), new Circle(-.1, .1, .4)]
+//var circleList = [new Circle(-.4, -.2, .6), new Circle(-.6, .1, .3),  new Circle(.4, .2, .6), new Circle(-.4, -.4, .2), new Circle(-.1, .4, .5), new Circle(-.3, .4, .5), new Circle(-.1, .1, .4)]
+//var circleList = [new Circle(-.4, -.2, .6), new Circle(-.6, .1, .3), new Circle(.4, .25, .4), new Circle(.4, .2, .6), new Circle(-.3, -.35, .2), new Circle(-.1, .4, .5), new Circle(-.3, .4, .5), new Circle(-.1, .1, .4)]
+//var circleList = [new Circle(-.53, .6, .17), new Circle(-.09, .49, .38), new Circle(-.63, .02, .58)]
+//var circleList = [new Circle(-.53, .6, .17), new Circle(-.09, .49, .38)]
+//var circleList = [new Circle(-.2, .5, .15), new Circle(0, .5, .15), new Circle(.2, .5, .15)]
+//var circleList = [new Circle(-.4, .3, .55), new Circle(.4, .3, .55)]
+var circleList = []
+
+var interList = []
+
+var regList = []
+
+var csteps = 12;
+
+var drawInters = false;
+
+// ind is used to uniquely identify circles/intersections
+
+function Circle(x, y, r) {
+  this.type="Circle"
+  this.x = x
+  this.y = y
+  this.r = r
+  this.ind
+  this.draw = function() {
+    ctx.beginPath()
+    ctx.arc(this.x*scale, -this.y*scale, this.r*scale, 0, 2*pi, true)
+    ctx.stroke()
+    ctx.closePath()
+  }
+  this.copy = function() {
+    return new Circle(this.x, this.y, this.r)
+  }
+  this.inters = []
+}
+
+function Intersection(x, y, circs) {
+  this.type="Intersection" //debugging
+  this.x = x
+  this.y = y
+  this.circs = circs
+  this.ind = -1
+  this.regions = []
+  this.parity = -1
+  
+  this.spoints = [[],[]] // one array per circle
+  this._spoints = [[],[]]
+}
+
+// a is an array of three-tuples
+// each three-tuple is an Intersection, 0 or 1 for which circle it's on, -1 or 1 for clockwise or anti
+function Region(a) {
+  this.d = a
+  this.n = a.length
+  this.color = -1
+  this.ind = -1
+  
+  this._ps;
+  this._tris;
+  this._preoff = -1;
+  
+  this.draw = function(color) {
+    ctx.beginPath()
+    //ctx.moveTo(this.d[0][0].x*scale, -1*this.d[0][0].y*scale)
+    
+
+    for(var i=1; i<=this.n; i++) {
+      var c = this.d[i-1][0].circs[this.d[i-1][1]].circ
+      var a1 = angleBetween(c, this.d[i-1][0])
+      var a2 = angleBetween(c, this.d[i%this.n][0])
+      
+      var af = drawInters?Math.min(Math.abs(a2-a1), 2*Math.PI-Math.abs(a2-a1)) / (2*Math.PI) : 0
+
+	  a1 += (this.d[i-1][2]==1?1:-1)*Math.PI*af*2/3
+      a2 -= (this.d[i-1][2]==1?1:-1)*Math.PI*af*2/3
+      
+      ctx.arc(c.x*scale, -c.y*scale, c.r*scale, -a1, -a2, this.d[i-1][2]==1)
+    }
+    var c = color*255
+    ctx.fillStyle = "rgba(" +c + "," + c + "," + c + ",.4)"
+    ctx.fill()  
+    ctx.closePath()
+  }
+  
+  
+  
+  
+  
+  
+  // *******
+  
+  this.pointset = function() {
+  	function dpoint(p) {
+  		//ctx.translate(scale+1, scale+1)
+  		ctx.beginPath()
+  		ctx.moveTo(p.x*scale, p.y*-scale)
+  		ctx.arc(p.x*scale, p.y*-scale, 10, 2*Math.PI, true)
+  		ctx.fill()
+  		ctx.closePath()
+  		//ctx.translate(-scale-1, -scale-1)
+  	}
+  
+  	var steps = csteps;
+  
+  	var pointlist = [];
+  	var interpoints = [];
+  	
+    for(var i=1; i<=this.n; i++) {
+      var c = this.d[i-1][0].circs[this.d[i-1][1]].circ
+      var a1 = angleBetween(c, this.d[i-1][0])
+      var a2 = angleBetween(c, this.d[i%this.n][0])
+      
+      
+      var af = Math.min(Math.abs(a2-a1), 2*Math.PI-Math.abs(a2-a1)) / (2*Math.PI)
+      
+      a1 += (this.d[i-1][2]==1?1:-1)*Math.PI*af*2/3
+      a2 -= (this.d[i-1][2]==1?1:-1)*Math.PI*af*2/3
+      
+      var cfrac;
+      var ta1 = a1;
+      var ta2 = a2;
+      if(ta1<ta2) ta1+=2*Math.PI
+      cfrac = ta2 - ta1;
+      if(this.d[i-1][2]==1) cfrac+=2*Math.PI
+      cfrac/=steps;
+      
+      this.d[i-1][0].spoints[this.d[i-1][1]].push([c.x+c.r*Math.cos(a1), -(c.y + c.r*Math.sin(a1)) ])
+      
+      this.d[i-1][0]._spoints[this.d[i-1][1]].push({region: this, ind: pointlist.length} )
+      // ie, the one you're about to add
+      
+      for(var j=1; j<steps; j++) {
+      	pointlist.push([c.x+c.r*Math.cos(a1+cfrac*j), -(c.y+c.r*Math.sin(a1+cfrac*j))])
+      }
+      
+
+      this.d[i%this.n][0]._spoints[ (this.d[i%this.n][1]+1)%2 ].push( {region: this, ind: pointlist.length-1} )
+	  // ie, the one you just added
+
+      this.d[i%this.n][0].spoints[ (this.d[i%this.n][1]+1)%2 ].push( [c.x+c.r*Math.cos(a2), -(c.y + c.r*Math.sin(a2)) ])
+      
+    }
+    this._ps = pointlist
+    
+
+	
+	
+			
+// http://www.flipcode.com/archives/Efficient_Polygon_Triangulation.shtml			
+	var EPSILON=0.00000001;
+	
+	function Area(contour)
+	{
+	
+	  var n = contour.length;
+	
+	  var A=0.0;
+	
+	  for(var p=n-1,q=0; q<n; p=q++)
+	  {
+		A+= contour[p][0]*contour[q][1] - contour[q][0]*contour[p][1];
+	  }
+	  return A*0.5;
+	}
+	
+	   /*
+		 InsideTriangle decides if a point P is Inside of the triangle
+		 defined by A, B, C.
+	   */
+	function InsideTriangle( Ax,  Ay,
+							Bx,  By,
+							 Cx,  Cy,
+						   Px,  Py)
+	
+	{
+	  var ax, ay, bx, by, cx, cy, apx, apy, bpx, bpy, cpx, cpy;
+	  var cCROSSap, bCROSScp, aCROSSbp;
+	
+	  ax = Cx - Bx;  ay = Cy - By;
+	  bx = Ax - Cx;  by = Ay - Cy;
+	  cx = Bx - Ax;  cy = By - Ay;
+	  apx= Px - Ax;  apy= Py - Ay;
+	  bpx= Px - Bx;  bpy= Py - By;
+	  cpx= Px - Cx;  cpy= Py - Cy;
+	
+	  aCROSSbp = ax*bpy - ay*bpx;
+	  cCROSSap = cx*apy - cy*apx;
+	  bCROSScp = bx*cpy - by*cpx;
+	
+	  return ((aCROSSbp >= 0.0) && (bCROSScp >= 0.0) && (cCROSSap >= 0.0));
+	};
+	
+	
+	
+	
+	function Snip(contour, u, v, w, n,V)
+	{
+	  var p;
+	  var Ax, Ay, Bx, By, Cx, Cy, Px, Py;
+	
+	  Ax = contour[V[u]][0];
+	  Ay = contour[V[u]][1];
+	
+	  Bx = contour[V[v]][0];
+	  By = contour[V[v]][1];
+	
+	  Cx = contour[V[w]][0];
+	  Cy = contour[V[w]][1];
+	
+	  if ( EPSILON > (((Bx-Ax)*(Cy-Ay)) - ((By-Ay)*(Cx-Ax))) ) return false;
+	
+	  for (p=0;p<n;p++)
+	  {
+		if( (p == u) || (p == v) || (p == w) ) continue;
+		Px = contour[V[p]][0];
+		Py = contour[V[p]][1];
+		if (InsideTriangle(Ax,Ay,Bx,By,Cx,Cy,Px,Py)) return false;
+	  }
+	
+	  return true;
+	}
+	
+	
+	
+	function Process(contour)
+	{
+	  var result = []
+	  var n = contour.length;
+	  if ( n < 3 ) return false;
+	
+	  var V = [];
+	
+	  /* we want a counter-clockwise polygon in V */
+	
+	  if ( 0.0 < Area(contour) )
+		for (var v=0; v<n; v++) V[v] = v;
+	  else
+		for (var v=0; v<n; v++) V[v] = (n-1)-v;
+	
+	  var nv = n;
+	
+	  /*  remove nv-2 Vertices, creating 1 triangle every time */
+	  var count = 2*nv;   /* error detection */
+	
+	  for(var m=0, v=nv-1; nv>2; )
+	  {
+		/* if we loop, it is probably a non-simple polygon */
+		if (0 >= (count--))
+		{
+		  //** Triangulate: ERROR - probable bad polygon!
+		  return false;
+		}
+	
+		/* three consecutive vertices in current polygon, <u,v,w> */
+		var u = v  ; if (nv <= u) u = 0;     /* previous */
+		v = u+1; if (nv <= v) v = 0;     /* new v    */
+		var w = v+1; if (nv <= w) w = 0;     /* next     */
+	
+		if ( Snip(contour,u,v,w,nv,V) )
+		{
+		  var a,b,c,s,t;
+	
+		  /* true names of the vertices */
+		  a = V[u]; b = V[v]; c = V[w];
+	
+		  /* output Triangle */
+		  result.push( [a, b, c] );
+	
+		  m++;
+	
+		  /* remove v from remaining polygon */
+		  for(s=v,t=v+1;t<nv;s++,t++) V[s] = V[t]; nv--;
+	
+		  /* resest error detection counter */
+		  count = 2*nv;
+		}
+	  }
+	
+	
+	  return result;
+	}
+
+
+	var tris = Process(pointlist)
+
+
+
+	this._tris = tris;
+  }
+  
+  
+  
+  
+  
+  
+  
+  this.isExt = function() {
+    ext = true
+    outer:for(i in this.d) {
+      for(j in circleList) {
+        if(this.d[i][0].circs[0].circ.ind != circleList[j].ind && this.d[i][0].circs[1].circ.ind != circleList[j].ind) {
+          if(distance(this.d[i][0], circleList[j]) < circleList[j].r) {
+            ext = false
+            break outer
+          }
+        }
+      }
+    }
+    for(i=0; i<this.n; i++) {
+      var c = this.d[i][0].circs[this.d[i][1]].circ
+      var a1 = angleBetween(c, this.d[i][0])
+      var a2 = angleBetween(c, this.d[(i+1)%this.n][0])
+      var ta = (a1+a2)/2
+      if(this.d[i][2]==1 ^ a1<a2)
+        ta+=pi
+      var p = new Circle(c.r*cos(ta)+c.x, c.r*sin(ta)+c.y,.02)
+      var oc = this.d[i][0].circs[(this.d[i][1]+1)%2].circ
+      if(distance(oc, p) < oc.r) {
+        ext = false
+        break
+      }      
+    }
+    return ext
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function weave(inter, par) {
+  if(inter.parity!=-1) return
+  inter.parity = par
+  var c = inter.circs[par]
+
+  ctx.strokeStyle="rgb(255,0,0)"
+  ctx.lineWidth = 2.5
+  ctx.beginPath()
+  ctx.arc(c.circ.x*scale, c.circ.y*-scale, c.circ.r*scale, -c.ang-1/10, -c.ang+1/10, false)
+  ctx.stroke()
+  ctx.closePath()
+  ctx.lineWidth = 1
+  ctx.strokeStyle="rgb(0,0,0)"
+
+  for(var h in inter.circs) {
+    for(var hh in [0,1]) {
+      var isAt = -1
+      var circ = inter.circs[h].circ
+      for(var k in circ.inters) {
+        if(circ.inters[k].inter.ind == inter.ind) {
+          isAt = 1*k
+          break
+        }
+      }
+      if(isAt == -1) {alert("WHAT"); return}
+      
+      var tt = circ.inters[(isAt+(hh*2)-1+circ.inters.length)%circ.inters.length]
+      
+      var isAt2 = -1
+      for(var k in tt.inter.circs) {
+        if(tt.inter.circs[k].circ.ind == circ.ind) {
+          isAt2 = 1*k
+          break
+        }
+      }
+      if(isAt2 == -1) {alert("WHAT2"); return}
+      
+      if(par==h) {
+        weave(tt.inter, (isAt2+1)%2)
+      }
+      
+    }
+  }
+}
+
+function floodFill(region, color) {
+  if(region.color!=-1) return    
+  region.color = color
+  if(!region.isExt()) {
+  	region.draw(color)
+  	if(color==0) region.pointset()
+  }
+  var d = region.d
+  for(var i in d) {
+    var inter = d[i][0]
+    var cind = inter.circs[d[i][1]].circ.ind
+    for(var j in inter.regions) {
+      var treg = inter.regions[j]
+      var isAt = -1
+      for(var k in treg.d) {
+        if(treg.d[k][0].ind == inter.ind) {
+          isAt = k
+          break
+        }
+      }
+      if(isAt == -1) {alert("WHAT"); return}
+      
+      if(treg.d[isAt][0].circs[treg.d[isAt][1]].circ.ind == cind) {
+        floodFill(treg, color)
+      }
+      else {
+        floodFill(treg, (color+1)%2)
+      }      
+    }
+  }
+}
+
+
+
+
+
+function findExt() {
+  if(regList.length==0) return null;
+  
+  var extList = []
+  for (var i in regList) {
+    if(regList[i].isExt()) {
+      extList.push(regList[i])
+    }
+  }
+  return extList[0]
+}
+
+function findInds() {
+  for(var i=0; i<circleList.length; i++) {
+    circleList[i].ind=i
+  }
+  for(var i=0; i<interList.length; i++) {
+    interList[i].ind=i
+  }
+  for(var i in regList) {
+    regList[i].ind=i
+  }
+}
+
+function findInters() {
+  for (var i=0; i<circleList.length; i++) {    
+    var t1 = circleList[i]
+    for (var j=i+1; j<circleList.length; j++) {
+      var t2 = circleList[j]
+      var nInters = circIntersect(t1, t2)
+      if(!nInters) continue  // circles do not intersect
+      
+      t1.inters.push({"inter":nInters[0], "imat":0})
+      t1.inters.push({"inter":nInters[1], "imat":0})
+      t2.inters.push({"inter":nInters[0], "imat":1})
+      t2.inters.push({"inter":nInters[1], "imat":1})
+      
+      interList.push(nInters[0])
+      interList.push(nInters[1])
+    }
+    t1.inters.sort(function(a,b){ // want them to be sorted by angle from the center of t1
+      return a.inter.circs[a.imat].ang - b.inter.circs[b.imat].ang
+
+    })
+
+    // intersection can figure out where it is on a circle
+    for (var k in t1.inters) {
+      t1.inters[k].inter.circs[t1.inters[k].imat].imat = i
+    }
+  }
+}
+
+
+function findRegions() {
+  var o = []
+
+  for(var g in interList) {
+    var start = interList[g]
+    for(var h in [0,1]) {
+      for(var hh in [0,1]) {
+          
+        var c = interList[g].circs[h].circ
+        var t = start
+        var dir = 2*hh-1
+        var next, n, tt, tw, ta, p, oc, ta1, ta2, m, w
+        var reg = []
+        var reg2 = []
+
+        w=(t.circs[0].circ.ind == c.ind)?0:1
+      
+        do {
+          oc = c
+          for(var i=0; i<c.inters.length; i++) {
+            if(c.inters[i].inter.ind == t.ind) {
+              n = i
+            }
+          }
+          next = n+dir
+          t = c.inters[(next+c.inters.length)%c.inters.length].inter
+      
+          // we want the _other_ circle, not the one we're on
+          if(t.circs[w].circ.ind == c.ind) {
+            w = (w+1)%2
+          }
+          c = t.circs[w].circ;
+          // Ugh... determines which direction is "inside"
+          for(var i=0; i<c.inters.length; i++) {
+            if(c.inters[i].inter.ind == t.ind) {
+              n = i
+            }
+           }
+          next = n+1
+          tt = c.inters[(next+c.inters.length)%c.inters.length].inter
+          ta1 = (t.circs[0].circ.ind == c.ind)?t.circs[0].ang:t.circs[1].ang
+          ta2 = (tt.circs[0].circ.ind == c.ind)?tt.circs[0].ang:tt.circs[1].ang
+          ta = (ta1+ta2)/2
+          if(ta2 < ta1) ta+=pi // bleh
+          p = new Circle(c.r*cos(ta)+c.x, c.r*sin(ta)+c.y,.02)
+          if(distance(oc, p) < oc.r) { // ie p is in c 
+            // NOTHING - if we were going anti we still go anti; if we weren't we still aren't
+          }
+          else {
+            dir *= -1
+          }
+          reg.push([t, w, dir]);
+        }
+        while(start.ind!=t.ind) // If we always turn left we'll eventually get back to where we start
+      
+        // this block ensures a region's first point is the intersection with the lowest index
+        // m keeps track of lowest index and position thereof
+        m = [Infinity,Infinity]
+        for(var j=0; j<reg.length; j++) {
+          if(reg[j][0].ind < m[0]) m=[reg[j][0].ind, j]
+        }
+        var j=m[1]
+        reg2 = []
+        do {
+          reg2.push(reg[j])
+          j=(j+1)%reg.length
+        } while(j!=m[1])
+      
+        var isDup = false
+        for(var j=0; j<o.length; j++) {
+          if(o[j].n==reg2.length && o[j].d[0][0].ind == reg2[0][0].ind) {
+            if(o[j].d[0][1]==reg2[0][1] && o[j].d[0][2]==reg2[0][2]) {isDup=true; break}
+          }
+        }
+        if(!isDup) {
+          var s = new Region(reg2)
+          o.push(s)
+          for(var j in s.d) {
+            s.d[j][0].regions.push(s)
+          }
+        }
+      }
+    }
+  }
+  
+  return o
+}
+
+
+
+
+
+
+
+function circIntersect(a, b) {
+  var ta = a.copy()
+  var tb = b.copy()
+
+  // find offset and adjust to it
+  var of = [a.x, a.y]
+  ta.x=0; ta.y=0;
+  tb.x-=of[0]; tb.y-=of[1];
+  
+  // find rotation and adjust to it
+  var theta = Math.atan2(tb.y, tb.x)
+  tb.x = Math.sqrt(tb.x*tb.x+tb.y*tb.y)
+  tb.y = 0
+  
+  // MATH UP IN THIS BITCH
+  var x = (tb.x*tb.x - tb.r*tb.r + ta.r*ta.r) / (2*(tb.x))
+  if(ta.r*ta.r - x*x < 0) return null; // circles do not intersect
+  var y1 = Math.sqrt(ta.r*ta.r - x*x)
+  var y2 = -y1
+  
+  // adjust rotation of intersects and fix offsets
+  var tx1 = x*cos(theta) - y1*sin(theta)  + of[0]
+  var ty1 = x*sin(theta) + y1*cos(theta)  + of[1]
+  var tx2 = x*cos(theta) - y2*sin(theta)  + of[0]
+  var ty2 = x*sin(theta) + y2*cos(theta)  + of[1]
+  
+  // angle (for ordering)
+  var theta11 = Math.atan2(ty1-a.y, tx1-a.x)
+  var theta21 = Math.atan2(ty2-a.y, tx2-a.x)
+  var theta12 = Math.atan2(ty1-b.y, tx1-b.x)
+  var theta22 = Math.atan2(ty2-b.y, tx2-b.x)
+  if (theta11 < 0) theta11+=2*pi
+  if (theta21 < 0) theta21+=2*pi
+  if (theta12 < 0) theta12+=2*pi
+  if (theta22 < 0) theta22+=2*pi
+  
+  // circle can figure out where it is on an intersection
+  return [new Intersection(tx1, ty1, [{"circ":a, "ang":theta11}, {"circ":b, "ang":theta12}]),
+          new Intersection(tx2, ty2, [{"circ":a, "ang":theta21}, {"circ":b, "ang":theta22}])]
+}
+
+
+function distance(a,b) { //takes intersections or circles or whatever
+  return Math.sqrt( (a.x-b.x)*(a.x-b.x) + (a.y-b.y)*(a.y-b.y) )
+}
+
+function angleBetween(p1, p2) {
+  return Math.atan2(p2.y-p1.y,p2.x-p1.x)
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function draw() {
+  canvas = document.getElementById("canvas");
+  ctx = canvas.getContext("2d");
+  //canvas.height = scale*2+2
+  canvas.height = window.innerHeight-2*canvas.offsetTop
+  //canvas.width = scale*2+2
+  canvas.width = window.innerWidth-2*canvas.offsetLeft
+  ctx.fillStyle = "rgba(0,0,0,.1)";
+  //ctx.translate(scale+1, scale+1)
+  
+  canvas.addEventListener("mousedown", mouseDownH, false);
+  canvas.addEventListener("mousemove", mouseMoveH, false);
+  canvas.addEventListener("mouseup", mouseUpH, false);
+  
+  update()
+}
+
+
+function update() {
+  ctx.translate(scale+1, scale+1)
+
+  ctx.clearRect(-canvas.width, -canvas.width, 3*canvas.height, 3*canvas.height)
+  interList = []
+  regList = []
+  for (var i in circleList) {
+    circleList[i].draw()
+    circleList[i].inters=[]
+  }
+  findInters()
+  findInds()
+  var regs = findRegions() 
+  regList = regs
+  findInds()
+
+  var ext = findExt()
+  if(ext) floodFill(ext, 1)
+  
+  for(var i in interList) {
+    weave(interList[i], 0)
+  }
+  
+  
+  // ***
+  if(drawInters) {
+  for(var i in interList) {
+  	ctx.fillStyle="rgba(255,0,0,.5)"
+  	ctx.beginPath()
+  	ctx.moveTo(interList[i].spoints[0][0][0]*scale, interList[i].spoints[0][0][1]*scale)
+  	ctx.lineTo(interList[i].spoints[1][0][0]*scale, interList[i].spoints[1][0][1]*scale)
+  	ctx.lineTo(interList[i].spoints[0][1][0]*scale, interList[i].spoints[0][1][1]*scale)
+  	ctx.lineTo(interList[i].spoints[1][1][0]*scale, interList[i].spoints[1][1][1]*scale)
+  	ctx.moveTo(interList[i].spoints[0][0][0]*scale, interList[i].spoints[0][0][1]*scale)
+  	ctx.fill()
+  	ctx.closePath()
+  	
+  	ctx.strokeStyle="rgba(0,255,0,.5)"
+  	ctx.beginPath()
+  	ctx.moveTo(interList[i].spoints[ interList[i].parity ][0][0]*scale, interList[i].spoints[ interList[i].parity ][0][1]*scale)
+  	ctx.lineTo(interList[i].spoints[ interList[i].parity ][1][0]*scale, interList[i].spoints[ interList[i].parity ][1][1]*scale)
+  	ctx.stroke()
+  	ctx.closePath()
+  	ctx.strokeStyle="rgb(0,0,0)"
+  }
+  }
+  
+  ctx.translate(-scale-1, -scale-1)
+}
+
+
+
+var isDown = false
+var xi, yi
+function mouseDownH(e) {
+  isDown = true
+  xi = e.pageX-canvas.offsetLeft
+  yi = e.pageY-canvas.offsetTop
+  circleList.push(new Circle((xi-scale)/(scale), (scale-yi)/(scale), .0001))
+}
+
+function mouseMoveH(e) {
+  if(!isDown) return  
+  circleList[circleList.length-1].r = distance({"x": xi/(scale), "y": yi/(scale)}, {"x":(e.pageX-canvas.offsetLeft)/(scale), "y":(e.pageY-canvas.offsetTop)/(scale)})
+  update()
+  //circleList[circleList.length-1].draw()
+}
+
+function mouseUpH(e) {
+  if(!isDown) return
+  isDown = false
+  update()
+}
+
+
+</script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// *******
+
+
+
+
+
+
+
+
+
+
+<script src="pre3d.js"></script>
+<script src="pre3d_shape_utils.js"></script>
+<script src="pre3d_path_utils.js"></script>
+<script src="demo_utils.js"></script>
+<script>
+// (c) Dean McNamee <dean@gmail.com>.  All rights reserved.
+
+
+function zsmooth(obj) {
+
+// 	function copyvert(v) {
+// 		return {x: v.x, y:v.y, z:v.z}
+// 	}
+
+	var skiplist = []
+	for(var i in obj.quads) {
+		var p0 = obj.vertices[obj.quads[i].i0]
+		var p1 = obj.vertices[obj.quads[i].i1]
+		var p2 = obj.vertices[obj.quads[i].i2]
+		var p3 = (obj.vertices[obj.quads[i].i3]==null)?null:obj.vertices[obj.quads[i].i3]
+		
+		var z0 = p0.z
+		var z1 = p1.z
+		var z2 = p2.z
+		var z3 = p3?p3.z:null
+		
+		if(p3) {
+			obj.vertices[obj.quads[i].i0].z = z0+1/2*((z1+z3)/2-z0)
+			obj.vertices[obj.quads[i].i1].z = z0+1/2*((z0+z2)/2-z1)
+			obj.vertices[obj.quads[i].i2].z = z0+1/2*((z1+z3)/2-z2)
+			obj.vertices[obj.quads[i].i3].z = z0+1/2*((z0+z2)/2-z3)
+		}
+		else {
+			obj.vertices[obj.quads[i].i0].z = z0+1/2*((z1+z2)/2-z0)
+			obj.vertices[obj.quads[i].i1].z = z0+1/2*((z0+z2)/2-z1)
+			obj.vertices[obj.quads[i].i2].z = z0+1/2*((z1+z0)/2-z2)
+		}
+	}
+}
+
+
+
+function addTwist(obj, sp1, sp2, ep1, ep2) {
+	var pi = Math.PI
+	var sin = Math.sin
+	var cos = Math.cos
+	
+	var height = Math.min(
+		Math.sqrt(Math.pow(sp2[0]-sp1[0], 2) + Math.pow(sp2[1]-sp1[1], 2) ), 
+		Math.sqrt(Math.pow(ep2[0]-ep1[0], 2) + Math.pow(ep2[1]-ep1[1], 2) )  )
+
+	
+	var steps = 15
+	
+	var prelen = obj.vertices.length
+	
+	for(var t=0; t<=steps-1; t++) { //fencepost
+		var pt = t/(steps-1)
+		
+		var sp = {
+				x: (1-pt)*sp1[0] + pt*ep1[0], 
+				y: -(ep1[1]-sp1[1])* (cos(pi*pt)+1)/2 + ep1[1],
+				z: sin(pi*pt)/2*height }
+		
+		var ep = {
+				x: (1-pt)*sp2[0] + pt*ep2[0], 
+				y: -(ep2[1]-sp2[1])* (cos(pi*pt)+1)/2 + ep2[1],
+				z: -sin(pi*pt)/2*height }
+		
+		
+		for(var s=0; s<=steps-1; s++) {
+			var ps = s/(steps-1)
+
+			var x = (1-ps)*sp.x + ps*ep.x;
+			var y = (1-ps)*sp.y + ps*ep.y;
+			var z = (1-ps)*sp.z + ps*ep.z;
+
+			obj.vertices.push({
+				x:  x,
+				y:  y,
+				z:  z
+			})
+		}
+	}
+	
+	for(var i=0; i<steps*steps-steps-1; i++) {
+		if((i+1)%steps == 0) continue;
+		obj.quads.push(new Pre3d.QuadFace(prelen+i, prelen+i+steps, prelen+i+steps+1, prelen+i+1))
+		obj.quads.push(new Pre3d.QuadFace(prelen+i, prelen+i+1, prelen+i+steps+1, prelen+i+steps))
+	}
+	
+	var edges = [[],[]];
+	for(var i=0; i<steps; i++) {
+		edges[0].push(prelen+i)
+		edges[1].push(prelen+steps*steps-steps+i)
+	}
+	
+	Pre3d.ShapeUtils.rebuildMeta(obj);
+	return edges;
+}
+
+
+
+
+
+function start3d() {
+  var screen_canvas = document.getElementById('canvas');
+  var renderer = new Pre3d.Renderer(screen_canvas);
+	
+	
+
+  var bigobj = new Pre3d.Shape();
+
+  for(var i in regList) {
+  	if(regList[i].color==1) continue // not filled
+  	
+  	var prelen = bigobj.vertices.length
+  	regList[i]._preoff = prelen
+  	for(var j in regList[i]._ps) {
+	  	bigobj.vertices.push({
+				x:  regList[i]._ps[j][0],
+				y:  -regList[i]._ps[j][1],
+				//z:  .01*(Math.random()*2-1)
+				//z:	i/(5*regList.length)
+				z:	0
+			})
+	}
+	
+	for(var k in regList[i]._tris) {
+		bigobj.quads.push(new Pre3d.QuadFace(
+			prelen + regList[i]._tris[k][0],
+			prelen + regList[i]._tris[k][1],
+			prelen + regList[i]._tris[k][2],
+			null ))
+		bigobj.quads.push(new Pre3d.QuadFace(
+			prelen + regList[i]._tris[k][0],
+			prelen + regList[i]._tris[k][2],
+			prelen + regList[i]._tris[k][1],
+			null ))
+	}
+  }
+
+  for(var i in interList) {
+  	var jk = interList[i].parity
+  	var kj = (jk+1)%2
+  	var edges = addTwist(bigobj, 
+	  	[interList[i].spoints[jk][0][0],-interList[i].spoints[jk][0][1] ],
+		[interList[i].spoints[kj][0][0],-interList[i].spoints[kj][0][1] ],
+		[interList[i].spoints[jk][1][0],-interList[i].spoints[jk][1][1] ],
+		[interList[i].spoints[kj][1][0],-interList[i].spoints[kj][1][1] ]
+	)
+	
+	//console.log(edges)
+	
+	//bigobj.vertices[edges[0][0]].z = .05
+	//bigobj.vertices[edges[0][edges[0].length-1]].z = -.05
+	//bigobj.vertices[edges[1][0]].z = -.05
+	
+
+	ctx.fillStyle="rgba(0,0,0,.8)"
+	var r1 = interList[i]._spoints[jk]
+	var r2 = interList[i]._spoints[kj]
+
+	
+		bigobj.quads.push(new Pre3d.QuadFace(
+			edges[0][0],
+			edges[0][edges[0].length-1],
+			r2[0].region._preoff + r2[0].ind,
+			r1[0].region._preoff + r1[0].ind ))
+			
+		bigobj.quads.push(new Pre3d.QuadFace(
+			edges[1][0],
+			edges[1][edges[1].length-1],
+			r2[1].region._preoff + r2[1].ind,
+			r1[1].region._preoff + r1[1].ind ))
+
+		bigobj.quads.push(new Pre3d.QuadFace(
+			edges[0][0],
+			r1[0].region._preoff + r1[0].ind,
+			r2[0].region._preoff + r2[0].ind,
+			edges[0][edges[0].length-1] ))
+			
+		bigobj.quads.push(new Pre3d.QuadFace(
+			edges[1][0],
+			r1[1].region._preoff + r1[1].ind,
+			r2[1].region._preoff + r2[1].ind,
+			edges[1][edges[1].length-1] ))
+
+	Pre3d.ShapeUtils.rebuildMeta(bigobj);
+  }
+  //return;
+
+
+//   for(var i=0; i<3; i++)
+// 	  zsmooth(bigobj)
+
+
+
+
+  var green = new Pre3d.RGBA(0x78 / 255, 0xff / 255, 0x00/255, 1);
+  var blue = new Pre3d.RGBA(0x33 / 255, 0x33 / 255, 0xFF/255, 1);
+  var grey = new Pre3d.RGBA(0x77 / 255, 0x77 / 255, 0x77/255, 1);
+  var pink = new Pre3d.RGBA(0xFF / 255, 0x00 / 255, 0xCC/255, 1);
+  var bleen = new Pre3d.RGBA(0x00 / 255, 0xAA / 255, 0xAA/255, 1);
+
+
+  function draw() {
+    renderer.fill_rgba = bleen;
+    renderer.bufferShape(bigobj)
+
+
+    // White background.
+    renderer.ctx.setFillColor(1, 1, 1, 1);
+    renderer.drawBackground();
+
+    renderer.drawBuffer();
+    renderer.emptyBuffer();
+  }
+
+  renderer.camera.focal_length = 5.5;
+  DemoUtils.autoCamera(renderer, -1, 0, -8, 0, 0, 0, draw);
+
+
+  draw()
+}
+
+function keyh(e) {
+	if(String.fromCharCode(e.which)==" ") {
+ 		canvas.removeEventListener("mousedown", mouseDownH, false);
+  		canvas.removeEventListener("mousemove", mouseMoveH, false);
+  		canvas.removeEventListener("mouseup", mouseUpH, false);
+		start3d()
+	}
+}
+
+window.addEventListener("keypress", keyh, false) 
+</script>
+
+</body>
+</html

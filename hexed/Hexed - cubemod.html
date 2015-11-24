@@ -1,0 +1,218 @@
+<html>
+ <head>
+<script type="application/x-javascript">
+  
+var canvas;
+var ctx;
+
+sqrt = Math.sqrt
+
+var scale = 600;
+var linewidth = .3;
+
+var n = 400;
+
+var size = 1/6;
+var speed = 1/50;
+
+var liferange = 50;
+var lifemin = 100;	// lifetime falls in [lifemin, lifemin + liferange]
+					// We need these as variables for spawn probability calculation
+				
+var hexes = [];
+
+var ticklen = 20;
+
+
+function draw() {
+	canvas = document.getElementById("canvas");
+	ctx = canvas.getContext("2d");
+	canvas.height = scale*1
+	canvas.width = scale*1
+    
+    ctx.translate(0, scale)
+	
+	ctx.lineWidth = linewidth;
+	
+	ctx.fillStyle="rgb(0,0,0)"
+	ctx.strokeStyle = "rgb(255, 255, 255)"
+    getStarted()
+}
+
+
+function Hex(x, y, z, r, v, dir, life) {
+	this.x = x
+	this.y = y
+	this.z = z
+	this.r = r
+	this.v = v*(1-r*3) // smaller blocks can be faster
+	this.dir = dir
+	this.life = life
+}
+
+function randHex() {
+	return new Hex(Math.random(), Math.random(), Math.random(), // x, y, z
+				Math.random()*size,					// r
+				Math.random()*speed+.001,				// v
+				Math.floor(Math.random()*6),		// dir
+				Math.floor(Math.random()*liferange+lifemin)		// life
+			)
+}
+
+function Point(x,y) {
+	this.x = x
+	this.y = y
+}
+
+function upHex(hex) {
+	hex.life--;
+	
+	var f = sqrt(3)/2;
+	var v = hex.v;
+	
+	switch(hex.dir) {
+		case 0:
+			hex.x -= f*v;
+			hex.y += 1/2 * v;
+			break;
+		case 1:
+			hex.y += v;
+			break;
+		case 2:
+			hex.x += f*v;
+			hex.y += 1/2 * v;
+			break;
+		case 3:
+			hex.x += f*v;
+			hex.y -= 1/2 * v;
+			break;
+		case 4:
+			hex.y -= v;
+			break;
+		case 5:
+			hex.x -= f*v;
+			hex.y -= 1/2 * v;
+			break;
+	}
+}
+
+
+function drawHex(h) {
+	var f = sqrt(3)/2;
+	
+	var c1 = "rgb(64, 64, 64)"
+	var c2 = "rgb(128, 128, 128)"
+	var c3 = "rgb(192, 192, 192)"
+	
+	function drawPoly(a, shouldFill, color) {
+		ctx.beginPath();
+		ctx.moveTo(a[0].x*scale, a[0].y*-scale);
+		for(i=1; i<a.length; i++) {
+			ctx.lineTo(a[i].x*scale, a[i].y*-scale);
+		}
+		ctx.lineTo(a[0].x*scale, a[0].y*-scale);
+		if(shouldFill) {
+			ctx.fillStyle = color;
+			ctx.fill();
+			ctx.fillStyle = "rgb(0,0,0)"
+		}
+		//else
+			ctx.stroke();
+		ctx.closePath();
+	}
+	
+	
+	var ps = []
+	ps.push(new Point(h.x-h.r*f, h.y+1/2*h.r))
+	ps.push(new Point(h.x, h.y+h.r))
+	ps.push(new Point(h.x+h.r*f, h.y+1/2*h.r))
+	ps.push(new Point(h.x+h.r*f, h.y-1/2*h.r))
+	ps.push(new Point(h.x, h.y-h.r))
+	ps.push(new Point(h.x-h.r*f, h.y-1/2*h.r))
+	
+	var center = new Point(h.x, h.y) // not actually necessary: hex extends point, so we could use it. But eh.
+	
+	//drawPolyP(ps, false);
+	
+	drawPoly([ps[0], ps[1], ps[2], center], true, c3)
+	drawPoly([ps[2], ps[3], ps[4], center], true, c2)
+	drawPoly([ps[4], ps[5], ps[0], center], true, c1)
+	
+}
+
+
+
+function getStarted() {
+
+	for(var i = 0; i < n; i++) {
+		hexes.push(randHex());
+	}
+	
+	tick();
+}
+
+
+function tick() {
+	ctx.fillRect(-scale, -scale, 3*scale, 3*scale)
+	hexes.sort(function(a,b) {return a.z - b.z})
+
+	hexes.map(drawHex)
+	hexes.map(upHex)
+	for(var i=hexes.length-1; i >= 0; i--) {
+		if(hexes[i].life <= 0) {
+			hexes.splice(i,1)
+		}
+	}
+
+
+	/*
+	Let's do some math!
+	
+	expected number of live blocks = average number spawned per tick * average lifetime
+	ie, n = lambda * avg life
+
+	So we want a discrete probability distribution with mean lambda.
+	http://en.wikipedia.org/wiki/List_of_probability_distributions#Discrete_distributions
+
+	I like infinite support, so that there's no upper bound on the number spawned.	
+	http://en.wikipedia.org/wiki/List_of_probability_distributions#With_infinite_support
+
+	Good candidates are geometric and Poisson.
+
+	Of these, Poisson is the more reasonable. Also, it's mathematically the one we want.
+	
+	Per Knuth and http://en.wikipedia.org/wiki/Poisson_distribution#Generating_Poisson-distributed_random_variables
+	we can generate a Poisson random number with parameter lambda using the below function.
+	
+	*/
+	
+	var lambda = n / (lifemin + liferange/2);
+	
+	function Poisson(lambda) {
+		var L = Math.exp(-lambda)
+		var k = 0
+		var p = 1
+		
+		while(p > L) {
+			k++
+			p *= Math.random()
+		}
+		return k - 1;
+	}
+	
+	var adding = Poisson(lambda)
+	for(var i=0; i<adding; i++) hexes.push(randHex())
+	
+
+	setTimeout(tick, ticklen);
+}
+
+
+</script>
+ </head>
+ <body onload="draw()">
+	Precisely the same as Hexed - layers, but with a different coloring on hexagons (and a couple parameters tweaked).
+	<br><br><br>
+   <canvas id="canvas" width="1" height="1" style="padding:5px"></canvas>
+ </body>
+</html>

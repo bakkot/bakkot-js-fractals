@@ -1,0 +1,374 @@
+<html>
+<body onload="loaded()">
+Fractally generated terrain. Click to iterate; click and drag to rotate. Simple enough that I rolled my own 3d code.
+<br>
+<canvas id="thecanvas"></canvas>
+<script type="text/javascript">
+
+Object.prototype.clone = function() {
+  var newObj = (this instanceof Array) ? [] : {};
+  for (var i in this) {
+    if (i == 'clone') continue;
+    if (this[i] && typeof this[i] == "object") {
+      newObj[i] = this[i].clone();
+    } else newObj[i] = this[i]
+  } return newObj;
+};
+
+var CXscale = 300;
+var CYscale = 300;
+
+var canvas;
+var ctx;
+
+var wires = [];
+var triangles = [];
+
+var c; //keeps track of how much change there can be
+var steepness = .5; //how much distortion. Play with it! .2 is nearly flat, .5 is rocky, .8 is hilly, etc.
+
+var curAng;  //Roll, pitch, and yaw, natch. Used when spinning.
+var rMat;  //keeps track of how everything has been rotated, for rendering
+
+var init_iters = 0;  //how many levels deep at start
+
+var clearCruft = true;  
+
+var viewfudge = -.7  //initial view pitch. Zero is straight on.
+
+function loaded() {
+  canvas=document.getElementById('thecanvas')
+	canvas.addEventListener("mousedown", mDown, false)
+	canvas.addEventListener("mouseup", mUp, false)
+	canvas.addEventListener("mousemove", mMove, false)
+	canvas.addEventListener("click", clicked, false)
+	document.addEventListener("keypress", keypressed, false)
+
+  ctx=canvas.getContext('2d')
+  canvas.height=2*CXscale
+  canvas.width=2*CYscale
+
+  setup()
+  render(wires, curAng)
+}
+
+function setup() {
+  c = steepness;
+
+  curAng = [0,0,0]
+  rMat = [ [  1,  0,  0  ],
+           [  0,  Math.cos(viewfudge),  -Math.sin(viewfudge)  ],
+           [  0,  Math.sin(viewfudge),   Math.cos(viewfudge)  ] ];
+
+  //wires = [ [[-.7,-.7,0],[.7,-.7,0]], [[.7,-.7,0],[0,.7,0]], [[0,.7,0],[-.7,-.7,0]] ]
+  wires = [ [[-.7,-.57,0],[.7,-.57,0]], [[.7,-.57,0],[0,.57,0]], [[0,.57,0],[-.7,-.57,0]] ]
+  triangles = [ [0],[1],[2] ]
+  doStuff(init_iters)
+}
+
+//triangles identified by the lines forming its edges. Lines are identified by the path (in wires) to get to them
+//the logic is terrifying, but it works
+function stuff(a) {
+  if(typeof(a[0][0])=="number") {  //the triangle's first line's first pathstep
+    var s1 = wires; //s1, s2, and s3 are either arrays of two points each or arrays of two lines each
+    for(var i=0; i<a[0].length; i++) {
+      s1=s1[a[0][i]]
+    }
+    var s2 = wires
+    for(var i=0; i<a[1].length; i++) {
+      s2=s2[a[1][i]]
+    }
+    var s3 = wires
+    for(var i=0; i<a[2].length; i++) {
+      s3=s3[a[2][i]]
+    }
+
+    var m1;
+    var m2;
+    var m3;
+    var t1;
+    var t2;
+    if(typeof(s1[0][0])=="number") { //the first point's x-coordinate should be a number, otherwise the line's already been divided into two segments
+      d=distance(s1[0], s1[1])
+      m=midpoint(s1[0], s1[1])
+      m=mutate(m)
+      t1=[s1[0],m]
+      t2=[m,s1[1]]
+      s1[0]=t1
+      s1[1]=t2
+      //alert(t1)
+    }
+    if(typeof(s2[0][0])=="number") { //the first point's x-coordinate should be a number, otherwise the line's already been divided into two segments
+      d=distance(s2[0], s2[1])
+      m=midpoint(s2[0], s2[1])
+      m=mutate(m)
+      t1=[s2[0],m]
+      t2=[m,s2[1]]
+      s2[0]=t1
+      s2[1]=t2
+      //alert(t1)
+    }
+    if(typeof(s3[0][0])=="number") { //the first point's x-coordinate should be a number, otherwise the line's already been divided into two segments
+      d=distance(s3[0], s3[1])
+      m=midpoint(s3[0], s3[1])
+      m=mutate(m)
+      t1=[s3[0],m]
+      t2=[m,s3[1]]
+      s3[0]=t1
+      s3[1]=t2
+      //alert('s3')
+    }
+    
+    m1=s1[0][1]
+    m2=s2[0][1]
+    m3=s3[0][1]
+    
+    //at this point we have the three sides, s1, s2, and s3, each of which has been mutated. Now we store the new lines -
+    //wires.push([[m1,m2],[m2,m3],[m3,m1]])
+    wires.push([[m2,m1],[m3,m2],[m1,m3]])
+    var l=wires.length-1
+    
+    //alert(l)
+    
+    // - and the new triangles.
+    p00=a[0].clone()
+    p00.push(0)
+    //alert(a[0])
+    //alert(p00)
+    p01=a[0].clone()
+    p01.push(1)
+    p10=a[1].clone()
+    p10.push(0)
+    p11=a[1].clone()
+    p11.push(1)
+    p20=a[2].clone()
+    p20.push(0)
+    p21=a[2].clone()
+    p21.push(1)
+    p30=[l,0]
+    p31=[l,1]
+    p32=[l,2]
+    
+    //alert(p21)
+    //alert(p30)
+    
+    r = [ [p00, p32, p21], [p01, p10, p30], [p31,p11,p20], [p32, p31, p30] ]
+    return r
+  }
+  else {
+    var o = [];
+    for(var i=0; i<a.length; i++) {
+      o.push(stuff(a[i]))
+    }
+    return o;
+  }
+}
+
+function recursiveRender(a, tmat) {
+  try {if(typeof(a[0][0])=="number") {  //the line's first point's x-coordinate
+    p1=transformPoint(a[0], [0,0,0], tmat)
+    p2=transformPoint(a[1], [0,0,0], tmat)
+    ctx.beginPath()
+    ctx.moveTo(p1[0]*CXscale+CXscale, -1*p1[1]*CYscale+CYscale)
+    ctx.lineTo(p2[0]*CXscale+CXscale, -1*p2[1]*CYscale+CYscale)
+    ctx.stroke()
+    ctx.closePath()
+  }
+  else {
+    for(var i=0; i<a.length; i++) {
+      recursiveRender(a[i], tmat)
+    }
+  }
+  }
+  catch(e) {
+    alert(a[0])
+  }
+}
+
+function render(points, angles) {
+  tmat = transMat(angles)
+  rMat = multiply3x3(tmat, rMat)
+  recursiveRender(points, rMat)
+  curAng = [0,0,0]
+  //deb(rMat.join("<br>"))
+}
+
+function mutate(p) {
+  return [p[0], p[1], p[2] + (c*(Math.random()-.5))]
+}
+
+function doStuff(x) {
+  for(var i=0; i<x; i++) {
+    triangles=stuff(triangles)
+    c/=2
+  }
+  recursiveRender(wires, rMat)
+}
+
+
+function midpoint(a, b) {
+  return [(a[0]+b[0])/2, (a[1]+b[1])/2, (a[2]+b[2])/2]
+}
+
+function distance(a, b) {
+  return Math.sqrt(Math.pow(a[0]-b[0],2)+Math.pow(a[1]-b[1],2)+Math.pow(a[2]-b[2],2))
+}
+
+
+function pitchTransform(theta) {
+  var s = Math.sin(theta);
+  var c = Math.cos(theta);
+  return [ [  1,  0,  0  ],
+           [  0,  c, -s  ],
+           [  0,  s,  c  ] ];
+}
+
+function yawTransform(theta) {
+  var s = Math.sin(theta);
+  var c = Math.cos(theta);
+  return [ [  c,  0, s  ],
+           [  0,  1, 0  ],
+           [ -s,  0, c  ] ];
+}
+
+function rollTransform(theta) {
+  var s = Math.sin(theta);
+  var c = Math.cos(theta);
+  return [ [  c, -s, 0  ],
+           [  s,  c, 0  ],
+           [  0,  0, 1  ] ];
+}
+
+function multiply3x3(one, two) {
+  return [
+           [ one[0][0]*two[0][0] + one[0][1]*two[1][0] + one[0][2]*two[2][0],
+             one[0][0]*two[0][1] + one[0][1]*two[1][1] + one[0][2]*two[2][1],
+             one[0][0]*two[0][2] + one[0][1]*two[1][2] + one[0][2]*two[2][2] ],
+           [ one[1][0]*two[0][0] + one[1][1]*two[1][0] + one[1][2]*two[2][0],
+             one[1][0]*two[0][1] + one[1][1]*two[1][1] + one[1][2]*two[2][1],
+             one[1][0]*two[0][2] + one[1][1]*two[1][2] + one[1][2]*two[2][2] ],
+           [ one[2][0]*two[0][0] + one[2][1]*two[1][0] + one[2][2]*two[2][0],
+             one[2][0]*two[0][1] + one[2][1]*two[1][1] + one[2][2]*two[2][1],
+             one[2][0]*two[0][2] + one[2][1]*two[1][2] + one[2][2]*two[2][2] ]
+         ];
+}
+
+function multiply3x1(one, two) {
+  return [ one[0][0]*two[0] + one[0][1]*two[1] + one[0][2]*two[2],
+           one[1][0]*two[0] + one[1][1]*two[1] + one[1][2]*two[2],
+           one[2][0]*two[0] + one[2][1]*two[1] + one[2][2]*two[2] ];
+}
+
+
+function transformPoint(p, c, transMatrix) {
+  var result = [ p[0], p[1], p[2] ];
+  result[0] -= c[0];
+  result[1] -= c[1];
+  result[2] -= c[2];
+  result = multiply3x1(transMatrix, result);
+  result[0] += c[0];
+  result[1] += c[1];
+  result[2] += c[2];
+  return result;
+}
+
+function rotatePoint(p, c, angles) {
+  var tRoll = rollTransform(angles[0])
+  var tPitch = pitchTransform(angles[1])
+  var tYaw = yawTransform(angles[2])
+  var transMatrix = multiply3x3(tRoll, multiply3x3(tPitch, tYaw));
+  return transformPoint(p, c, transMatrix)
+}
+
+function rotatePoints(ps, c, angles) {
+  var nPs = []
+  var tRoll = rollTransform(angles[0])
+  var tPitch = pitchTransform(angles[1]);
+  var tYaw = yawTransform(angles[2]);
+  var transMatrix = multiply3x3(tRoll, multiply3x3(tPitch, tYaw));
+  for(var i=0; i<ps.length; i++) {
+    nPs.push(transformPoint(ps[i], c, transMatrix))
+  }
+  return nPs
+}
+
+function transMat(angles) {
+  var tRoll = rollTransform(angles[0])
+  var tPitch = pitchTransform(angles[1]);
+  var tYaw = yawTransform(angles[2]);
+  return multiply3x3(tRoll, multiply3x3(tPitch, tYaw));
+}
+
+
+function clear() {
+  ctx.clearRect(-1,-1,CXscale*3, CYscale*3)
+}
+
+
+var isDown = false;
+var xi = 0;
+var xy = 0;
+
+var timer;
+var ts = 0;
+
+var moved = false;
+
+function mDown(e) {
+  isDown = true
+  xi = e.clientX
+  yi = e.clientY
+  timer = window.setInterval("ts++",10)
+  moved = false;
+}
+
+function mUp(e) {
+  isDown = false
+}
+
+function mMove(e) {
+  if(isDown) {
+    var xdif = e.clientX-xi
+    var ydif = e.clientY-yi
+    var xPerc = xdif/CXscale
+    var yPerc = ydif/CYscale
+    xi = e.clientX
+    yi = e.clientY
+    
+    curAng[2]+=Math.PI*xPerc
+    curAng[1]+=Math.PI*yPerc
+    clear()
+    render(wires, curAng)
+
+    moved=true;
+  }
+}
+
+function clicked(e) {
+  if(ts<12 && !moved) {
+    doStuff(1)
+    if(clearCruft) clear()
+    render(wires, curAng)
+  }
+  window.clearInterval(timer)
+  ts=0;
+}
+
+function keypressed(e) {
+  var ch = String.fromCharCode(e.which)
+  if(ch=="r") {
+    clear()
+    setup()
+    render(wires, curAng)
+  }
+}
+
+function deb(s) {
+  document.getElementById('deb').innerHTML=s
+}
+</script>
+
+<br><br>
+<font id='deb'></font>
+</body>
+</html>

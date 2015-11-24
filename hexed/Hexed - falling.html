@@ -1,0 +1,126 @@
+<html>
+ <head>
+<script type="application/x-javascript">
+  
+var canvas;
+var ctx;
+var pi = Math.PI
+
+sqrt = Math.sqrt
+
+var scale = 800;
+var cw = 3;
+
+var n = 8;
+
+var hexes = [];
+
+var speed = .02;
+var to = 20;
+
+// domain:  [-2pi, 2pi]^2
+// center: [0,0]
+
+function draw() {
+	canvas = document.getElementById("canvas");
+	ctx = canvas.getContext("2d");
+	canvas.height = scale+2
+	canvas.width = scale+2
+    
+    ctx.translate(0, scale)
+	
+	ctx.fillStyle="rgb(0,0,0)"
+    getStarted()
+}
+
+function Point(x,y) {
+	this.x = x
+	this.y = y
+	//this.clone = function(){return new Point(this.x, this.y)}
+	//this.toString = function(){return "(" + this.x + "," + this.y + ")"}
+	//this.draw = function(){drawCircle(this)}
+}
+
+
+function drawHex(p, r, isWhite) {
+	var f = sqrt(3)/2;
+	var tf = ctx.fillStyle;
+	var k = isWhite?0:255;
+	ctx.fillStyle="rgb(" + k + "," + k + "," + k + ")"
+	
+	function drawPolyP(a) {
+		ctx.beginPath();
+		ctx.moveTo(a[0].x*scale, a[0].y*-scale);
+		for(i=1; i<a.length; i++) {
+			ctx.lineTo(a[i].x*scale, a[i].y*-scale);
+		}
+		ctx.lineTo(a[0].x*scale, a[0].y*-scale);
+		ctx.fill();
+		ctx.closePath();
+	}
+	
+	var ps = []
+	ps.push(new Point(p.x-r*f, p.y+1/2*r))
+	ps.push(new Point(p.x, p.y+r))
+	ps.push(new Point(p.x+r*f, p.y+1/2*r))
+	ps.push(new Point(p.x+r*f, p.y-1/2*r))
+	ps.push(new Point(p.x, p.y-r))
+	ps.push(new Point(p.x-r*f, p.y-1/2*r))
+	
+	drawPolyP(ps);
+	
+	ctx.fillStyle = tf;
+}
+
+
+
+function getStarted() {
+	var f = sqrt(3)/2;
+	var x,y,p;
+	for(var i=0; i<n/f; i++) {
+		var c=f*i/n;
+		for(var j=0; j<n*2/3; j++) {
+			x = c;
+			y = 3/2*j/n;
+			hexes.push([new Point(x, y), Math.random()*2-1])
+			x += f*1/(2*n);
+			y += 3/4*1/n;
+			p = new Point(x, y)
+			hexes.push([new Point(x, y), Math.random()*2-1])
+		}
+	}
+	
+	tick();
+}
+
+
+function tick() {
+	function fm(a) {
+		var r = a[1] - speed;
+		if(r<-1) r+=2;
+		
+		if(r<0)	{
+			drawHex(a[0], 1/(2*n),true);
+			drawHex(a[0], (1+r)/(2*n),false);
+		}
+		else {
+			drawHex(a[0], 1/(2*n),false);
+			drawHex(a[0], r/(2*n),true);
+		}
+		return [a[0], r];
+	}
+	
+	hexes = hexes.map(fm);
+	
+	setTimeout(tick, to);
+}
+
+
+</script>
+ </head>
+ <body onload="draw()">
+ 	A recreation of <a href="http://dvdp.tumblr.com/post/15604336418/120110">dvdp's 120110</a>.
+ 	<br><br><br>
+   <canvas id="canvas" width="1" height="1" style="padding:5px"></canvas>
+ </body>
+</html>

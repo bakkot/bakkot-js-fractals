@@ -1,0 +1,357 @@
+<html>
+ <head>
+  <script type="application/x-javascript">
+var canvas;
+var ctx;
+
+var scale=350
+
+
+
+var rho = 28
+var sigma = 10
+var beta = 8/3
+
+
+function xprime(x,y,z,t) {
+  return sigma*(y-x)
+}
+
+function yprime(x,y,z,t) {
+  return x*(rho-z)-y
+}
+
+function zprime(x,y,z,t) {
+  return x*y-beta*z
+}
+
+
+
+
+
+
+
+var curAng = [0, 0, 0]  //probably wonky to change this
+var cubePoints = [[1,1,1], [1,1,0], [1,0,1], [1,0,0],   [0,1,1], [0,1,0], [0,0,1], [0,0,0]]
+var rMat = [ [  1, 0, 0  ],
+             [  0, 1, 0  ],
+             [  0, 0, 1  ] ];  //initially identity. Keeps track of how rotations have gA.
+
+
+
+
+var tstart = 0
+var t = tstart
+var tmax = 40
+var tstep = .001
+var tskip = 100
+var ticklen = 10
+
+
+
+
+var xrange = [-25,25]
+var yrange = [-25,25]
+var zrange = [0,60]
+
+var p = [25,25,5, (t-tstart)/tmax]
+
+
+
+
+var path = [p]
+
+
+var xw = xrange[1]-xrange[0]
+var yw = yrange[1]-yrange[0]
+var zw = zrange[1]-zrange[0]
+
+var tcount = 0
+function tick() {
+  if(!isRunning) return
+  p = [p[0]+tstep*xprime(p[0],p[1],p[2],t), p[1]+tstep*yprime(p[0],p[1],p[2],t), p[2]+tstep*zprime(p[0],p[1],p[2],t), (t-tstart)/tmax]
+  t+=tstep
+  path.push(p)
+
+//SpectrumToRGB
+  if(t<tmax) {
+    if(tcount++%tskip==0) {
+      render()
+      setTimeout(tick, ticklen)
+    }
+    else {
+      renderA(path[path.length-2], path[path.length-1])
+      tick()
+    }  
+  }
+  else {
+    isRunning=false
+    render()
+  }
+}
+
+
+
+
+
+
+
+
+
+function draw() {
+  canvas = document.getElementById("canvas");
+  ctx = canvas.getContext("2d");
+  canvas.height = scale*((Math.sqrt(2)-1)*2+1)+2
+  canvas.width = scale*((Math.sqrt(2)-1)*2+1)+2
+  //canvas.addEventListener("click", onOff, false)
+  canvas.addEventListener("mousedown", mDown, false)
+  canvas.addEventListener("mouseup", mUp, false)
+  canvas.addEventListener("mousemove", mMove, false)
+
+  document.addEventListener("keypress", keypressed, false);
+
+  ctx.translate(scale/(2*Math.sqrt(2)), scale*(Math.sqrt(2))+1) //it's close enough
+
+  render()
+}
+
+function render() {
+  var tmat = transMat(curAng)
+  curAng=[0,0,0]
+
+  rMat = multiply3x3(tmat, rMat);  //we're keeping running track of how previous rotations have gA. 
+  cubePoints = transformPoints(cubePoints, [.5,.5,.5], tmat)
+
+  if(hasChanged && path.length>1) {
+    ctx.clearRect(-2*scale,-2*scale,4*scale,4*scale)
+    drawCube()
+
+    var tpath = transformPoints(path, [xw/2+xrange[0],yw/2+yrange[0],zw/2+zrange[0]], rMat)  //notice that visual rotations never change the actual points.
+		
+    var e = tpath[0]
+    e[0]=(e[0]-xrange[0])/xw
+    e[1]=(e[1]-yrange[0])/yw
+    e[2]=(e[2]-zrange[0])/zw
+    e=[(e[0]-.5)*scdist/(scdist+e[2])+.5, (e[1]-.5)*scdist/(scdist+e[2])+.5]
+    
+    ctx.beginPath()
+    ctx.moveTo(e[0] * scale * upscale, e[1] * -1*scale * upscale);
+    for(var i=1; i<tpath.length; i++) {
+      var s = e
+      e = tpath[i]
+      e[0]=(e[0]-xrange[0])/xw
+      e[1]=(e[1]-yrange[0])/yw
+      e[2]=(e[2]-zrange[0])/zw
+      e=[(e[0]-.5)*scdist/(scdist+e[2])+.5, (e[1]-.5)*scdist/(scdist+e[2])+.5]
+      ctx.lineTo(e[0] * scale * upscale, e[1] * -1*scale * upscale);
+    }
+    ctx.stroke()
+    ctx.closePath()
+  }
+  else if(path.length>1) {
+    renderA(path[path.length-2], path[path.length-1])
+  }
+  else
+    drawCube()
+
+
+  hasChanged = false;
+}
+
+function renderA(a, b) {
+  var e = transformPoint(a, [xw/2+xrange[0],yw/2+yrange[0],zw/2+zrange[0]], rMat) 
+  e[0]=(e[0]-xrange[0])/xw
+  e[1]=(e[1]-yrange[0])/yw
+  e[2]=(e[2]-zrange[0])/zw
+  var s = transformPoint(b, [xw/2+xrange[0],yw/2+yrange[0],zw/2+zrange[0]], rMat) 
+  s[0]=(s[0]-xrange[0])/xw
+  s[1]=(s[1]-yrange[0])/yw
+  s[2]=(s[2]-zrange[0])/zw
+  drawLine(s, e)
+}
+
+
+
+var hasChanged = false
+var isRunning = false
+var isDown = false;
+var xi = 0;
+var xy = 0;
+
+function mDown(e) {
+  isDown = true
+  xi = e.clientX
+  yi = e.clientY
+}
+
+function mUp(e) {
+  isDown = false
+}
+
+function mMove(e) {
+  if(isDown) {
+    hasChanged = true
+    var xdif = e.clientX-xi
+    var ydif = e.clientY-yi
+    var xPerc = xdif/scale
+    var yPerc = ydif/scale
+    xi = e.clientX
+    yi = e.clientY
+    
+    curAng[2]-=Math.PI*xPerc
+    curAng[1]-=Math.PI*yPerc
+
+    if(!isRunning) {
+      ctx.clearRect(-2*scale,-2*scale,4*scale,4*scale)
+      render()
+    }
+  }
+}
+
+function onOff() {
+  isRunning=!isRunning
+  if(isRunning) tick()
+}
+
+function keypressed(e) {
+  if(String.fromCharCode(e.which)==" ") {
+    onOff()
+  }
+  else if (String.fromCharCode(e.which)=="r") {
+		curAng = [0, 0, 0]  //probably wonky to change this
+		cubePoints = [[1,1,1], [1,1,0], [1,0,1], [1,0,0],   [0,1,1], [0,1,0], [0,0,1], [0,0,0]]
+		rMat = [ [  1, 0, 0  ],
+			     [  0, 1, 0  ],
+			     [  0, 0, 1  ] ];  //initially identity. Keeps track of how rotations have gA.
+    hasChanged=true
+    render()
+  }
+}
+
+
+
+var scdist = 2.4
+var upscale = 1.1
+
+function drawLine(ar, ar1) {
+  var s=[(ar[0]-.5)*scdist/(scdist+ar[2])+.5, (ar[1]-.5)*scdist/(scdist+ar[2])+.5]
+  var e=[(ar1[0]-.5)*scdist/(scdist+ar1[2])+.5, (ar1[1]-.5)*scdist/(scdist+ar1[2])+.5]
+  
+  ctx.beginPath();
+  ctx.moveTo(s[0] * scale * upscale, s[1] * -1*scale * upscale);
+  ctx.lineTo(e[0] * scale * upscale, e[1] * -1*scale * upscale);
+  ctx.stroke()
+}
+
+function drawCube() {
+
+  ctx.strokeStyle="rgb(0,0,0)"
+  drawLine(cubePoints[0], cubePoints[1])
+  drawLine(cubePoints[1], cubePoints[3])
+  drawLine(cubePoints[3], cubePoints[2])
+  drawLine(cubePoints[2], cubePoints[0])
+  
+  drawLine(cubePoints[0], cubePoints[4])
+  
+  drawLine(cubePoints[4], cubePoints[5])
+  drawLine(cubePoints[5], cubePoints[7])
+  drawLine(cubePoints[7], cubePoints[6])
+  drawLine(cubePoints[6], cubePoints[4])
+  
+  drawLine(cubePoints[1], cubePoints[5])
+  drawLine(cubePoints[2], cubePoints[6])
+  drawLine(cubePoints[3], cubePoints[7])
+}
+
+
+
+
+function calcDist(p1, p2) {
+  return Math.sqrt((p1[0]-p2[0]).sq() + (p1[1]-p2[1]).sq() + (p1[2]-p2[2]).sq())
+}
+
+
+
+function pitchTransform(theta) {
+  var s = Math.sin(theta);
+  var c = Math.cos(theta);
+  return [ [  1,  0,  0  ],
+           [  0,  c, -s  ],
+           [  0,  s,  c  ] ];
+}
+
+function yawTransform(theta) {
+  var s = Math.sin(theta);
+  var c = Math.cos(theta);
+  return [ [  c,  0, s  ],
+           [  0,  1, 0  ],
+           [ -s,  0, c  ] ];
+}
+
+function rollTransform(theta) {
+  var s = Math.sin(theta);
+  var c = Math.cos(theta);
+  return [ [  c, -s, 0  ],
+           [  s,  c, 0  ],
+           [  0,  0, 1  ] ];
+}
+
+function multiply3x3(A, B) {
+  return [
+           [ A[0][0]*B[0][0] + A[0][1]*B[1][0] + A[0][2]*B[2][0],
+             A[0][0]*B[0][1] + A[0][1]*B[1][1] + A[0][2]*B[2][1],
+             A[0][0]*B[0][2] + A[0][1]*B[1][2] + A[0][2]*B[2][2] ],
+           [ A[1][0]*B[0][0] + A[1][1]*B[1][0] + A[1][2]*B[2][0],
+             A[1][0]*B[0][1] + A[1][1]*B[1][1] + A[1][2]*B[2][1],
+             A[1][0]*B[0][2] + A[1][1]*B[1][2] + A[1][2]*B[2][2] ],
+           [ A[2][0]*B[0][0] + A[2][1]*B[1][0] + A[2][2]*B[2][0],
+             A[2][0]*B[0][1] + A[2][1]*B[1][1] + A[2][2]*B[2][1],
+             A[2][0]*B[0][2] + A[2][1]*B[1][2] + A[2][2]*B[2][2] ]
+         ];
+}
+
+function multiply3x1(A, B) {
+  return [ A[0][0]*B[0] + A[0][1]*B[1] + A[0][2]*B[2],
+           A[1][0]*B[0] + A[1][1]*B[1] + A[1][2]*B[2],
+           A[2][0]*B[0] + A[2][1]*B[1] + A[2][2]*B[2] ];
+}
+
+
+function transformPoint(p, c, transMatrix) {
+  var result = [ p[0], p[1], p[2] ];
+  result[0] -= c[0];
+  result[1] -= c[1];
+  result[2] -= c[2];
+  result = multiply3x1(transMatrix, result);
+  result[0] += c[0];
+  result[1] += c[1];
+  result[2] += c[2];
+  return result;
+}
+
+function transformPoints(ps, c, transMatrix) {
+  var nPs = []
+  for(var i=0; i<ps.length; i++) {
+    nPs.push(transformPoint(ps[i], c, transMatrix))
+  }
+  return nPs
+}
+
+function transMat(angles) {
+  var tRoll = rollTransform(angles[0])
+  var tPitch = pitchTransform(angles[1]);
+  var tYaw = yawTransform(angles[2]);
+  return multiply3x3(tRoll, multiply3x3(tPitch, tYaw));
+}
+
+
+
+  </script>
+ </head>
+ <body onload="draw()">
+   Renders 3-dimensional differential equations, currently the Lorenz attractor. Press space to begin drawing; click and drag to rotate.
+   
+   Currently does not support entering your own equations, but the source is trivial to modify.
+   <canvas id="canvas" width="1" height="1"></canvas>
+ </body>
+</html>

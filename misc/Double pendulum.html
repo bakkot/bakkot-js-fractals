@@ -1,0 +1,249 @@
+
+<!-- saved from url=(0035)http://cs.ucsb.edu/~kgibbons/4.html -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"></head><body onload="draw()">
+
+<script>
+
+var scale = 400;
+
+function draw() { //some setup
+  canvas = document.getElementById("canvas");
+  ctx = canvas.getContext("2d");
+
+  canvas.width = scale*1+2  
+  canvas.height = scale*1+2
+  canvas.addEventListener("click", function(){going=!going; if(going)tick()}, false)
+  document.addEventListener("keypress", keyh, false)
+  //ctx.fillRect(0, 0, canvas.width, canvas.height)
+  ctx.strokeStyle = "rgb(127,0,0)"
+  ctx.lineWidth = 2.5
+
+  document.getElementById('button').addEventListener("click", function(){going=false; setTimeout(button, ticklen*2)}, false);
+ 
+
+  //alert(canvas.toDataURL())
+  //tick()
+  setup()
+}
+
+pi = Math.PI
+cos = Math.cos
+sin = Math.sin
+sq = function (x){return x*x}
+
+var ang1
+var ang2
+var v1
+
+var l = 1/4  //length
+var m //mass
+var g //gravity
+
+//var damp=.999999
+var damp = 1
+
+var trace = true;
+
+function a1(t1, t2, v1, v2) { //acceleration
+  return (-g * 3 * m * sin(t1) - m * g * sin(t1 - 2*t2) - 2 *sin(t1 - t2) * m * (sq(v2) * l + sq(v1) * l * cos(t1 - t2) ) ) / (l * (3 * m - m * cos(2 * t1 - 2 * t2) ) )
+}
+
+function a2(t1, t2, v1, v2) {
+  return (2 * sin(t1 - t2) * (sq(v1) * l * 2 * m + g * 2 * m * cos(t1) + sq(v2) * l * m * cos(t1 - t2) ) ) / (l * (3 * m - m * cos(2 * t1 - 2 * t2) ) )
+}
+
+
+var tl = .0001
+var ticklen = 5
+var drawEvery = 200
+var ticks = 0
+var going = true;
+
+var intmed = true;
+var inttick = 10;
+
+
+function setup() {
+	ctx.clearRect(-scale,-scale,3*scale,3*scale)
+  idata = ctx.getImageData(0,0,canvas.width,canvas.height);
+  path = []
+
+  tpoint = 0
+  ticks = 0
+
+  ang1 = Math.random()*Math.PI*2
+  ang2 = Math.random()*Math.PI*2
+  v1 = (Math.random()-.5)*10
+  v2 = (Math.random()-.5)*10
+  m = 1
+  g = 5
+  document.getElementById('ang1').value=ang1
+  document.getElementById('ang2').value=ang2
+  document.getElementById('v1').value=v1
+  document.getElementById('v2').value=v2
+  //document.getElementById('damp').value=-Math.log(1-damp)/Math.log(10)
+  document.getElementById('damp').value=damp
+  document.getElementById('m').value=m
+  document.getElementById('g').value=g
+  document.getElementById('drawEvery').value=drawEvery
+  document.getElementById('trace').checked=trace
+  
+  if(going) {
+    going=false
+    setTimeout(function() {going=true; tick()}, ticklen*2)
+  }
+  else {
+    p1 = [ origin[1] + l*sin(ang1), origin[0] + l*cos(ang1) ]
+    p2 = [ p1[0] + l*sin(ang2), p1[1] + l*cos(ang2) ]
+  	path.push(p2)
+    render()
+  }
+}
+
+function button() {
+  //alert('here')
+	ctx.clearRect(-scale,-scale,3*scale,3*scale)
+  idata = ctx.getImageData(0,0,canvas.width,canvas.height);
+  path = []
+
+  tpoint = 0
+  ticks = 0
+  
+  ang1=eval(document.getElementById('ang1').value)
+  ang2=eval(document.getElementById('ang2').value)
+  v1=eval(document.getElementById('v1').value)
+  v2=eval(document.getElementById('v2').value)
+  damp=eval(document.getElementById('damp').value)
+  //damp=1-Math.pow(10, -damp)
+  m=eval(document.getElementById('m').value)
+  g=eval(document.getElementById('g').value)
+  drawEvery=document.getElementById('drawEvery').value*1
+  trace=document.getElementById('trace').checked
+  
+  p1 = [ origin[1] + l*sin(ang1), origin[0] + l*cos(ang1) ]
+  p2 = [ p1[0] + l*sin(ang2), p1[1] + l*cos(ang2) ]
+  path.push(p2)
+  //going=true
+  //tick()
+  render()
+}
+
+function keyh(e){
+  if(String.fromCharCode(e.which)=="r") {
+    setup()
+  }
+}
+
+function tick() {
+  tv1 = v1 + tl * a1(ang1, ang2, v1, v2)
+  tv2 = v2 + tl * a2(ang1, ang2, v1, v2)
+  
+  ang1 += tl * v1
+  ang2 += tl * v2
+  
+  v1 = tv1*damp
+  v2 = tv2*damp
+  
+  var p1,p2
+  if(intmed && (ticks%inttick==0) ) {
+    p1 = [ origin[1] + l*sin(ang1), origin[0] + l*cos(ang1) ]
+    p2 = [ p1[0] + l*sin(ang2), p1[1] + l*cos(ang2) ]
+  	path.push(p2)
+  }
+  
+  if(!going) return;
+  if((ticks++)%drawEvery == 0) {
+    render()
+    setTimeout(tick, ticklen)
+  }
+  else tick()
+}
+
+var tracelim = 100
+var tpoints = 0;
+var idata;
+
+var path = []
+var origin = [.5,.5]
+function render() {
+  //deb(ang1 + "<br>" + ang2 + "<br><br>" + v1 + "<br>" + v2)
+
+	p1 = [ origin[1] + l*sin(ang1), origin[0] + l*cos(ang1) ]
+	p2 = [ p1[0] + l*sin(ang2), p1[1] + l*cos(ang2) ]
+  if(!intmed) {
+		path.push(p2)
+  }
+  
+  if(trace) {
+		ctx.clearRect(-scale,-scale,3*scale,3*scale)
+
+		ctx.putImageData(idata, 0, 0)
+		
+		if(path.length>1) {
+			ctx.save();
+			ctx.lineWidth=1/2;
+			ctx.strokeStyle="rgb(0,0,0)"
+			ctx.beginPath()
+			ctx.moveTo(path[0][0]*scale, path[0][1]*scale)
+			for(var i=1; i<path.length; i++) ctx.lineTo(path[i][0]*scale, path[i][1]*scale)
+			//deb(path.join("<br>"))
+			ctx.stroke()
+			ctx.closePath()
+			ctx.restore()
+		}
+		
+		if(!intmed) {
+			if((tpoints++)%tracelim == 0) {  //massive speedup!
+				idata = ctx.getImageData(0, 0, canvas.width, canvas.height);
+				path = [path.pop()]
+			}
+    }
+    else {
+			if((ticks)% (tracelim/100) == 0) {
+				idata = ctx.getImageData(0, 0, canvas.width, canvas.height);
+				path = [path.pop()]
+			}
+    }
+  }
+  else {
+    ctx.clearRect(-scale,-scale,3*scale,3*scale)
+  }
+  
+
+
+  
+  ctx.beginPath();
+  ctx.moveTo(origin[0]*scale, origin[1]*scale);
+  ctx.lineTo(p1[0]*scale, p1[1]*scale);
+  ctx.lineTo(p2[0]*scale, p2[1]*scale);
+  ctx.stroke()
+  ctx.closePath()
+  
+}
+
+function deb(s) {
+  document.getElementById("a").innerHTML = s;
+}
+
+</script>
+
+
+
+
+
+<canvas id="canvas" width="402" height="402"></canvas><br><br>
+<form>
+Click to pause/play. Press 'r' to randomize.<br>
+<input id="ang1" size="5">: Initial angle 1<br>
+<input id="ang2" size="5">: Initial angle 2<br>
+<input id="v1" size="5">: Initial angular velocity 1<br>
+<input id="v2" size="5">: Initial angular velocity 2<br>
+<input id="damp" size="5">: Damping factor (0-1, 1 being no damping) <br>
+<input id="m" size="5">: Mass<br>
+<input id="g" size="5">: Gravity<br>
+<input id="drawEvery" size="5">: Fast Forward<br>
+<input type="checkbox" id="trace">: Trace<br>
+<input type="button" value="Apply" id="button"><br>
+<p id="a"></p>
+
+</form></body></html>
