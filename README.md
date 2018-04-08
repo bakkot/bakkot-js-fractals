@@ -23,7 +23,7 @@ Links:
     -    [Mandelbrot](http://bakkot.github.io/bakkot-js-fractals/fractals/Mandelbrot.html)
     -    [Menger sponge](http://bakkot.github.io/bakkot-js-fractals/fractals/Menger%20sponge.html)
     -    [Nested circles](http://bakkot.github.io/bakkot-js-fractals/fractals/Nested%20circles.html)
-    -    [Pythagoras tree](http://bakkot.github.io/bakkot-js-fractals/fractals/Pythagoras %20ree.html)
+    -    [Pythagoras tree](http://bakkot.github.io/bakkot-js-fractals/fractals/Pythagoras%20tree.html) / [dynamic](http://bakkot.github.io/bakkot-js-fractals/fractals/Dynamic%20Pythag.html)
     -    [Square snowflake](http://bakkot.github.io/bakkot-js-fractals/fractals/Square%20snowflake.html)
     -    [Sunflower](http://bakkot.github.io/bakkot-js-fractals/fractals/Sunflower.html)
     -    [Terrain](http://bakkot.github.io/bakkot-js-fractals/fractals/Terrain.html)

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Dynamic pythagorean tree!</title>
+<script>
+'use strict';
+
+function dist(a, b) {
+  return Math.sqrt((b.x - a.x) ** 2 + (b.y - a.y) ** 2);
+}
+
+function angle(a, b) {
+  return Math.atan2(-(b.y - a.y), b.x - a.x);
+}
+
+function throttle(f, time) {
+  let ready = true;
+  return (...args) => {
+    if (ready) {
+      f(...args);
+      ready = false;
+      setTimeout(() => { ready = true; }, time);
+    }
+  };
+}
+
+addEventListener('load', () => {
+  const c = document.querySelector('canvas');
+  const ctx = c.getContext('2d');
+  
+  const iters = 7;
+
+  let adjustX = .7;
+  let adjustY = 1.4;
+
+  let base = { x: 0, y: 0 };
+  let scale = 0;
+
+  function redraw() {
+    const width = innerWidth - 20;
+    const height = innerHeight - 20;
+    c.width = width;
+    c.height = height;
+    ctx.fillStyle = 'rgba(0,0,0,.5)';
+    base = { x: width * 4 / 9, y: height * 3/4 };
+    scale = width / 9;
+    draw({
+      base,
+      scale,
+      rot: 0,
+      arity: 1,
+      n: 15,
+    });
+  }
+
+  function draw({ base, scale, rot, arity, n }) {
+    if (n < 1 || scale < 2) {
+      return;
+    }
+    ctx.beginPath();
+    ctx.moveTo(base.x, base.y);
+    const br = {
+      x: base.x + 1 * Math.cos(rot) * scale,
+      y: base.y - 1 * Math.sin(rot) * scale,
+    };
+    ctx.lineTo(br.x, br.y);
+    const tr = {
+      x: br.x - arity * Math.sin(rot) * scale,
+      y: br.y - arity * Math.cos(rot) * scale,
+    };
+    ctx.lineTo(tr.x, tr.y);
+    const tl = {
+      x: tr.x - 1 * Math.cos(rot) * scale,
+      y: tr.y + 1 * Math.sin(rot) * scale,
+    };
+    ctx.lineTo(tl.x, tl.y);
+    ctx.fill();
+
+
+    const triPoint = {
+      x: base.x + 1 * Math.cos(rot) * adjustX * scale - arity * Math.sin(rot) * adjustY * scale,
+      y: base.y - 1 * Math.sin(rot) * adjustX * scale - arity * Math.cos(rot) * adjustY * scale,
+    };
+
+    draw({
+      base: tl,
+      scale: dist(tl, triPoint),
+      rot: angle(tl, triPoint),
+      arity: arity,
+      n: n - 1,
+    });
+    draw({
+      base: tr,
+      scale: dist(tr, triPoint),
+      rot: angle(tr, triPoint),
+      arity: -arity,
+      n: n - 1,
+    });
+  }
+
+  function moved(e) {
+    if (e.which !== 1) {
+      return;
+    }
+    adjustX = (e.offsetX - base.x) / scale;
+    adjustY = -(e.offsetY - base.y) / scale;
+    redraw();
+  }
+
+  c.addEventListener('mousemove', throttle(moved, 50));
+
+  addEventListener('resize', throttle(redraw, 50));
+
+  redraw();
+});
+</script>
+</head>
+<body>
+<canvas width=500 height=500></canvas>
+</body>
+</html>
