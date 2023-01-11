@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang='en'>
+<head>
+  <meta charset='UTF-8'>
+  <title>Tiling the plane with recursive crosses</title>
+</head>
+<canvas id='canvas'></canvas>
+<script>
+'use strict';
+
+const SIZE = 500;
+const WIDTH_IN_SQUARES = 77;
+const ITERATIONS = 5;
+const FILL = 'rgba(0, 0, 0, 0.2)';
+const FILL_2 = 'rgba(255, 255, 255, 1)';
+const LINE_WIDTH = 1.5;
+
+function memoTuple(N) {
+  let map = new Map;
+  return (...items) => {
+    if (items.length !== N) {
+      throw new TypeError(`expected ${N}-tuple, but got ${items.length} items`);
+    }
+    let ptr = map;
+    for (let i = 0; i < items.length - 1; ++i) {
+      let item = items[i];
+      if (!ptr.has(item)) {
+        ptr.set(item, new Map);
+      }
+      ptr = ptr.get(item);
+    }
+    let last = items[items.length - 1];
+    if (!ptr.has(last)) {
+      ptr.set(last, items);
+    }
+    return ptr.get(last);
+  };
+}
+
+let Pt = memoTuple(2);
+let Edge = memoTuple(2);
+
+function translate(shape, x, y) {
+  return shape.map(e => Edge(...e.map(p => Pt(p[0] + x, p[1] + y))));
+}
+
+// there are smarter ways to find the boundary, but this works fine
+function filterToUniqueEdges(edges) {
+  let seen = new Set;
+  let seenTwice = new Set;
+  for (let e of edges) {
+    if (seen.has(e)) {
+      seenTwice.add(e);
+    } else {
+      seen.add(e);
+    }
+  }
+  return [...seen].filter(e => !seenTwice.has(e));
+}
+
+function meta(cross, n) {
+  let offsets = [1, 2];
+  // is there a closed form for this? probably?
+  for (let i = 1; i < n; ++i) {
+    let dir = (i & 1) === 0 ? -1 : 1;
+    offsets = [
+      offsets[0] + offsets[0] + dir * offsets[1],
+      offsets[1] + offsets[1] - dir * offsets[0],
+    ];
+  }
+  return filterToUniqueEdges([
+    ...cross,
+    ...translate(cross, offsets[0], offsets[1]),
+    ...translate(cross, -offsets[1], offsets[0]),
+    ...translate(cross, -offsets[0], -offsets[1]),
+    ...translate(cross, offsets[1], -offsets[0]),
+  ]);
+}
+
+// points within an edge should be ordered left->right, top->bottom
+// this is arbitrary; there just needs to be some convention so there is a unique way to write each edge.
+let square = [
+  Edge(Pt(0, 0), Pt(0, 1)),
+  Edge(Pt(0, 1), Pt(1, 1)),
+  Edge(Pt(1, 0), Pt(1, 1)),
+  Edge(Pt(0, 0), Pt(1, 0)),
+];
+
+let cross = filterToUniqueEdges([
+  ...square,
+  ...translate(square, 0, 1),
+  ...translate(square, 1, 0),
+  ...translate(square, 0, -1),
+  ...translate(square, -1, 0),
+]);
+
+let crossPath = [
+  [0, 1],
+  [0, 2],
+  [1, 2],
+  [1, 1],
+  [2, 1],
+  [2, 0],
+  [1, 0],
+  [1, -1],
+  [0, -1],
+  [0, 0],
+  [-1, 0],
+  [-1, 1],
+  [0, 1],
+];
+
+canvas.width = canvas.height = SIZE;
+let ctx = canvas.getContext('2d');
+ctx.lineWidth = LINE_WIDTH;
+
+let squareWidth = SIZE / WIDTH_IN_SQUARES;
+let zeroPoint = squareWidth * Math.floor(WIDTH_IN_SQUARES / 2);
+function pointToPixel(point) {
+  return [zeroPoint + squareWidth * point[0], zeroPoint + squareWidth * point[1]];
+}
+
+function drawShape(shape) {
+  for (let edge of shape) {
+    let [x1, y1] = pointToPixel(edge[0]);
+    let [x2, y2] = pointToPixel(edge[1]);
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+  }
+}
+
+function fillPath(path) {
+  ctx.beginPath();
+  let [x, y] = pointToPixel(path[0]);
+  ctx.moveTo(x, y);
+  for (let p of path.slice(1)) {
+    [x, y] = pointToPixel(p);
+    ctx.lineTo(x, y);
+  }
+  ctx.fill();
+}
+
+function tileWithCrosses() {
+  let start = Math.ceil(Math.floor(WIDTH_IN_SQUARES / 2) / 5) * 5;
+  let nextFill = FILL;
+  for (let k = -start - 5; k < WIDTH_IN_SQUARES; k += 5) {
+    ctx.fillStyle = nextFill;
+    nextFill = (nextFill === FILL) ? FILL_2 : FILL;
+    for (let i = -start - 5; i < WIDTH_IN_SQUARES; i += 5) {
+      fillPath(crossPath.map(([x, y]) => [x + i, y + k]));
+      fillPath(crossPath.map(([x, y]) => [x + i + 3, y + k + 1]));
+      fillPath(crossPath.map(([x, y]) => [x + i + 4, y + k - 2]));
+      ctx.fillStyle = ctx.fillStyle === FILL ? FILL_2 : FILL;;
+      fillPath(crossPath.map(([x, y]) => [x + i + 2, y + k - 1]));
+      fillPath(crossPath.map(([x, y]) => [x + i + 6, y + k - 3]));
+    }
+  }
+}
+
+function drawMetaCrosses() {
+  let m = cross;
+  drawShape(m);
+  for (let i = 1; i < ITERATIONS; ++i) {
+    m = meta(m, i);
+    drawShape(m);
+  }
+}
+
+tileWithCrosses();
+drawMetaCrosses();
+</script>

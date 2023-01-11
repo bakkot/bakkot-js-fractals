@@ -31,6 +31,7 @@ Links:
   - [Sunflower](http://bakkot.github.io/bakkot-js-fractals/fractals/Sunflower.html)
   - [Terrain](http://bakkot.github.io/bakkot-js-fractals/fractals/Terrain.html)
   - [von Koch](http://bakkot.github.io/bakkot-js-fractals/fractals/von%20Koch.html)
+  - [Cross](http://bakkot.github.io/bakkot-js-fractals/fractals/cross.html)
 
 - Misc
   - [Collatz](http://bakkot.github.io/bakkot-js-fractals/misc/Collatz.html)
